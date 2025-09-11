@@ -1,8 +1,10 @@
 package com.example.simplenote
 
+import android.util.Patterns
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.*
@@ -19,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.simplenote.auth.AuthViewModel
-import androidx.compose.foundation.shape.RoundedCornerShape
 
 @Composable
 fun LoginScreen(
@@ -30,13 +31,29 @@ fun LoginScreen(
     val purple = Color(0xFF504EC3)
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var attempted by remember { mutableStateOf(false) } // show errors after first attempt
 
     val ui = vm.uiState.value
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(ui.token) {
-        ui.token?.let { onLoginSuccess(it.access, it.refresh) }
+    // validation
+    val trimmedEmail = email.trim()
+    val isEmailValid = Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()
+    val isPasswordValid = password.isNotBlank()
+    val isFormValid = isEmailValid && isPasswordValid
+
+    fun tryLogin() {
+        attempted = true
+        if (isFormValid) {
+            vm.login(trimmedEmail, password)
+        } else {
+            // Optional: also show a snackbar; inline errors will already appear
+            // snackbarHostState.showSnackbar("Please fix the errors above")
+        }
     }
+
+    // navigate on success / show backend errors
+    LaunchedEffect(ui.token) { ui.token?.let { onLoginSuccess(it.access, it.refresh) } }
     LaunchedEffect(ui.error) {
         ui.error?.let {
             snackbarHostState.showSnackbar(it)
@@ -73,17 +90,15 @@ fun LoginScreen(
                     modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
                 )
 
-                Text(
-                    text = "Email Address",
-                    fontSize = 14.sp,
-                    color = Color(0xFF1C1B1F)
-                )
+                // Email
+                Text(text = "Email Address", fontSize = 14.sp, color = Color(0xFF1C1B1F))
                 Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
                     singleLine = true,
                     placeholder = { Text(text = "Example: johndoe@gmail.com") },
+                    isError = attempted && !isEmailValid,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(
@@ -91,14 +106,19 @@ fun LoginScreen(
                         imeAction = ImeAction.Next
                     )
                 )
+                if (attempted && !isEmailValid) {
+                    Text(
+                        text = "Enter a valid email address",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
 
                 Spacer(Modifier.height(16.dp))
 
-                Text(
-                    text = "Password",
-                    fontSize = 14.sp,
-                    color = Color(0xFF1C1B1F)
-                )
+                // Password
+                Text(text = "Password", fontSize = 14.sp, color = Color(0xFF1C1B1F))
                 Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = password,
@@ -106,6 +126,7 @@ fun LoginScreen(
                     singleLine = true,
                     placeholder = { Text(text = "********") },
                     visualTransformation = PasswordVisualTransformation(),
+                    isError = attempted && !isPasswordValid,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(
@@ -113,23 +134,35 @@ fun LoginScreen(
                         imeAction = ImeAction.Done
                     ),
                     keyboardActions = KeyboardActions(
-                        onDone = { vm.login(email.trim(), password) }
+                        onDone = { tryLogin() } // first time will set attempted=true and show errors
                     )
                 )
+                if (attempted && !isPasswordValid) {
+                    Text(
+                        text = "Password cannot be empty",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
 
                 Spacer(Modifier.height(28.dp))
 
+                // Keep button enabled so first tap triggers validation + error display
+                val buttonColors = ButtonDefaults.buttonColors(
+                    containerColor = if (isFormValid) purple else purple.copy(alpha = 0.4f),
+                    contentColor = if (isFormValid) Color.White else Color.White.copy(alpha = 0.7f),
+                    disabledContainerColor = purple.copy(alpha = 0.3f),
+                    disabledContentColor = Color.White.copy(alpha = 0.6f)
+                )
                 Button(
-                    onClick = { vm.login(email.trim(), password) },
-                    enabled = !ui.loading,
+                    onClick = { tryLogin() },
+                    enabled = !ui.loading, // don't disable for invalid form; we validate on click
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = purple,
-                        contentColor = Color.White
-                    )
+                    colors = buttonColors
                 ) {
                     if (ui.loading) {
                         CircularProgressIndicator(strokeWidth = 2.dp)
@@ -139,11 +172,7 @@ fun LoginScreen(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Login",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium
-                            )
+                            Text(text = "Login", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                             Spacer(Modifier.width(8.dp))
                             Icon(Icons.Default.ArrowForward, contentDescription = "Login")
                         }
