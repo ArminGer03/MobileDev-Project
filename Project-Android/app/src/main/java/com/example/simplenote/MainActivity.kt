@@ -3,13 +3,10 @@ package com.example.simplenote
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import com.example.simplenote.ui.theme.SimpleNoteTheme
 
 import androidx.compose.material3.Text
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 
 class MainActivity : ComponentActivity() {
 
@@ -18,23 +15,29 @@ class MainActivity : ComponentActivity() {
         data object Login : Screen()
         data object Register : Screen()
         data object Home : Screen()
+        data class Detail(val noteId: String) : Screen()
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
 
         setContent {
             SimpleNoteTheme {
                 var screen by remember { mutableStateOf<Screen>(Screen.Onboarding) }
+                var accessToken by remember { mutableStateOf<String?>(null) }
+                var lastRegisteredUsername by remember { mutableStateOf<String?>(null) }
 
-                when (screen) {
+                when (val s = screen) {
                     is Screen.Onboarding -> OnboardingScreen(
                         onGetStarted = { screen = Screen.Login }
                     )
 
                     is Screen.Login -> LoginScreen(
-                        onLoginSuccess = { _, _ -> screen = Screen.Home },
-                        onRegisterClick = { screen = Screen.Register } // <-- go to register
+                        onLoginSuccess = { access, _ ->
+                            accessToken = access
+                            screen = Screen.Home
+                        },
+                        onRegisterClick = { screen = Screen.Register }
                     )
 
                     is Screen.Register -> RegisterScreen(
@@ -45,22 +48,18 @@ class MainActivity : ComponentActivity() {
                         }
                     )
 
-                    is Screen.Home -> Greeting(name = "Android")
+                    is Screen.Home -> HomeScreen(
+                        onAddNote = { /* open create note screen */ },
+                        onOpenSettings = { /* open settings */ },
+                        username = lastRegisteredUsername
+                    )
+
+                    is Screen.Detail -> {
+                        // TODO: Note details screen (not part of this step)
+                        Text("Note detail: ${s.noteId}")
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(text = "Hello $name!", modifier = modifier)
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SimpleNoteTheme {
-        Greeting("Android")
     }
 }
