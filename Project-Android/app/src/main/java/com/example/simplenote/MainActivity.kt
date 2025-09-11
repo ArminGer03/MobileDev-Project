@@ -4,38 +4,39 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import com.example.simplenote.ui.theme.SimpleNoteTheme
 
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+
 class MainActivity : ComponentActivity() {
+
+    sealed class Screen { data object Onboarding : Screen(); data object Login : Screen(); data object Home : Screen() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
             SimpleNoteTheme {
-                var showOnboarding by remember { mutableStateOf(true) }
-                // If you later want to persist this, flip `showOnboarding`
-                // based on SharedPreferences/DataStore.
+                var screen by remember { mutableStateOf<Screen>(Screen.Onboarding) }
 
-                if (showOnboarding) {
-                    OnboardingScreen(
-                        onGetStarted = { showOnboarding = false }
+                when (screen) {
+                    is Screen.Onboarding -> OnboardingScreen(
+                        onGetStarted = { screen = Screen.Login }
                     )
-                } else {
-                    // Your app content
-                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                        Greeting(
-                            name = "Android",
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    }
+                    is Screen.Login -> LoginScreen(
+                        onLogin = { email, password ->
+                            // TODO: call your backend here later.
+                            screen = Screen.Home
+                        },
+                        onRegisterClick = {
+                            // TODO: navigate to Register screen when you build it
+                        }
+                    )
+                    is Screen.Home -> Greeting(name = "Android")
                 }
             }
         }
