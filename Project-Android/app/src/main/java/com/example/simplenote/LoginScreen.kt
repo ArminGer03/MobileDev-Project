@@ -1,6 +1,5 @@
 package com.example.simplenote
 
-import android.util.Patterns
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,30 +28,27 @@ fun LoginScreen(
     vm: AuthViewModel = viewModel()
 ) {
     val purple = Color(0xFF504EC3)
-    var email by remember { mutableStateOf("") }
+
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var attempted by remember { mutableStateOf(false) } // show errors after first attempt
+    var attempted by remember { mutableStateOf(false) }
 
     val ui = vm.uiState.value
     val snackbarHostState = remember { SnackbarHostState() }
 
     // validation
-    val trimmedEmail = email.trim()
-    val isEmailValid = Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()
+    val trimmedUser = username.trim()
+    // simple username rule: at least 3 chars, no spaces
+    val isUserValid = trimmedUser.length >= 3 && !trimmedUser.contains(' ')
     val isPasswordValid = password.isNotBlank()
-    val isFormValid = isEmailValid && isPasswordValid
+    val isFormValid = isUserValid && isPasswordValid
 
     fun tryLogin() {
         attempted = true
-        if (isFormValid) {
-            vm.login(trimmedEmail, password)
-        } else {
-            // Optional: also show a snackbar; inline errors will already appear
-            // snackbarHostState.showSnackbar("Please fix the errors above")
-        }
+        if (isFormValid) vm.login(trimmedUser, password)
     }
 
-    // navigate on success / show backend errors
+    // success / backend error
     LaunchedEffect(ui.token) { ui.token?.let { onLoginSuccess(it.access, it.refresh) } }
     LaunchedEffect(ui.error) {
         ui.error?.let {
@@ -90,25 +86,25 @@ fun LoginScreen(
                     modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
                 )
 
-                // Email
-                Text(text = "Email Address", fontSize = 14.sp, color = Color(0xFF1C1B1F))
+                // Username
+                Text(text = "Username", fontSize = 14.sp, color = Color(0xFF1C1B1F))
                 Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
+                    value = username,
+                    onValueChange = { username = it },
                     singleLine = true,
-                    placeholder = { Text(text = "Example: johndoe@gmail.com") },
-                    isError = attempted && !isEmailValid,
+                    placeholder = { Text(text = "Example: @HamifarTaha") },
+                    isError = attempted && !isUserValid,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Email,
+                        keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Next
                     )
                 )
-                if (attempted && !isEmailValid) {
+                if (attempted && !isUserValid) {
                     Text(
-                        text = "Enter a valid email address",
+                        text = "Username must be at least 3 characters (no spaces).",
                         color = MaterialTheme.colorScheme.error,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp)
@@ -133,13 +129,11 @@ fun LoginScreen(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done
                     ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { tryLogin() } // first time will set attempted=true and show errors
-                    )
+                    keyboardActions = KeyboardActions(onDone = { tryLogin() })
                 )
                 if (attempted && !isPasswordValid) {
                     Text(
-                        text = "Password cannot be empty",
+                        text = "Password cannot be empty.",
                         color = MaterialTheme.colorScheme.error,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp)
@@ -148,21 +142,19 @@ fun LoginScreen(
 
                 Spacer(Modifier.height(28.dp))
 
-                // Keep button enabled so first tap triggers validation + error display
-                val buttonColors = ButtonDefaults.buttonColors(
+                // Keep enabled so first tap triggers validation + error display
+                val btnColors = ButtonDefaults.buttonColors(
                     containerColor = if (isFormValid) purple else purple.copy(alpha = 0.4f),
-                    contentColor = if (isFormValid) Color.White else Color.White.copy(alpha = 0.7f),
-                    disabledContainerColor = purple.copy(alpha = 0.3f),
-                    disabledContentColor = Color.White.copy(alpha = 0.6f)
+                    contentColor = Color.White
                 )
                 Button(
                     onClick = { tryLogin() },
-                    enabled = !ui.loading, // don't disable for invalid form; we validate on click
+                    enabled = !ui.loading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(28.dp),
-                    colors = buttonColors
+                    colors = btnColors
                 ) {
                     if (ui.loading) {
                         CircularProgressIndicator(strokeWidth = 2.dp)

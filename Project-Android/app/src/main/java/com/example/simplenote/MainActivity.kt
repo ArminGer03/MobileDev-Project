@@ -13,8 +13,12 @@ import androidx.compose.ui.tooling.preview.Preview
 
 class MainActivity : ComponentActivity() {
 
-    sealed class Screen { data object Onboarding : Screen(); data object Login : Screen(); data object Home : Screen() }
-
+    sealed class Screen {
+        data object Onboarding : Screen()
+        data object Login : Screen()
+        data object Register : Screen()
+        data object Home : Screen()
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -27,13 +31,20 @@ class MainActivity : ComponentActivity() {
                     is Screen.Onboarding -> OnboardingScreen(
                         onGetStarted = { screen = Screen.Login }
                     )
+
                     is Screen.Login -> LoginScreen(
-                        onLoginSuccess = { access, refresh ->
-                            // TODO: Persist tokens with DataStore if you want.
-                            screen = Screen.Home
-                        },
-                        onRegisterClick = { /* navigate to Register later */ }
+                        onLoginSuccess = { _, _ -> screen = Screen.Home },
+                        onRegisterClick = { screen = Screen.Register } // <-- go to register
                     )
+
+                    is Screen.Register -> RegisterScreen(
+                        onBackToLogin = { screen = Screen.Login },
+                        onRegistered = { _, _ ->
+                            // Option 1: simply go back to login after a successful registration
+                            screen = Screen.Login
+                        }
+                    )
+
                     is Screen.Home -> Greeting(name = "Android")
                 }
             }
