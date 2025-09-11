@@ -1,7 +1,6 @@
 package com.example.simplenote
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -18,125 +17,160 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.simplenote.auth.AuthViewModel
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 @Composable
 fun LoginScreen(
-    onLogin: (email: String, password: String) -> Unit,
-    onRegisterClick: () -> Unit
+    onLoginSuccess: (access: String, refresh: String) -> Unit,
+    onRegisterClick: () -> Unit,
+    vm: AuthViewModel = viewModel()
 ) {
     val purple = Color(0xFF504EC3)
-
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    Surface(color = Color.White, modifier = Modifier.fillMaxSize()) {
-        Column(
+    val ui = vm.uiState.value
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(ui.token) {
+        ui.token?.let { onLoginSuccess(it.access, it.refresh) }
+    }
+    LaunchedEffect(ui.error) {
+        ui.error?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearError()
+        }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingVals ->
+        Surface(
+            color = Color.White,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.Start
+                .padding(paddingVals)
         ) {
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text = "Let’s Login",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1C1B1F) // near-black
-            )
-            Text(
-                text = "And notes your idea",
-                fontSize = 14.sp,
-                color = Color(0xFF9E9E9E),
-                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
-            )
-
-            // Email
-            Text(text = "Email Address", fontSize = 14.sp, color = Color(0xFF1C1B1F))
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                singleLine = true,
-                placeholder = { Text("Example: johndoe@gmail.com") },
-                shape = RoundedCornerShape(12.dp),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next
-                )
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            // Password
-            Text(text = "Password", fontSize = 14.sp, color = Color(0xFF1C1B1F))
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                singleLine = true,
-                placeholder = { Text("********") },
-                visualTransformation = PasswordVisualTransformation(),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { onLogin(email.trim(), password) }
-                )
-            )
-
-            Spacer(Modifier.height(28.dp))
-
-            // Login button
-            Button(
-                onClick = { onLogin(email.trim(), password) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = purple,
-                    contentColor = Color.White
-                )
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.Top,
+                horizontalAlignment = Alignment.Start
             ) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Login", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.width(8.dp))
-                    Icon(Icons.Default.ArrowForward, contentDescription = "Login")
-                }
-            }
+                Spacer(Modifier.height(8.dp))
 
-            // "Or" divider
-            Spacer(Modifier.height(16.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Divider(modifier = Modifier.weight(1f))
-                Text("  Or  ", color = Color(0xFF9E9E9E))
-                Divider(modifier = Modifier.weight(1f))
-            }
-
-            // Register link
-            Spacer(Modifier.height(12.dp))
-            TextButton(onClick = onRegisterClick, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text(
-                    text = "Don’t have any account? Register here",
-                    color = purple,
-                    textAlign = TextAlign.Center
+                    text = "Let’s Login",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1C1B1F)
                 )
+                Text(
+                    text = "And notes your idea",
+                    fontSize = 14.sp,
+                    color = Color(0xFF9E9E9E),
+                    modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                )
+
+                Text(
+                    text = "Email Address",
+                    fontSize = 14.sp,
+                    color = Color(0xFF1C1B1F)
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    singleLine = true,
+                    placeholder = { Text(text = "Example: johndoe@gmail.com") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next
+                    )
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Text(
+                    text = "Password",
+                    fontSize = 14.sp,
+                    color = Color(0xFF1C1B1F)
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    singleLine = true,
+                    placeholder = { Text(text = "********") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { vm.login(email.trim(), password) }
+                    )
+                )
+
+                Spacer(Modifier.height(28.dp))
+
+                Button(
+                    onClick = { vm.login(email.trim(), password) },
+                    enabled = !ui.loading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = purple,
+                        contentColor = Color.White
+                    )
+                ) {
+                    if (ui.loading) {
+                        CircularProgressIndicator(strokeWidth = 2.dp)
+                    } else {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Login",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Icon(Icons.Default.ArrowForward, contentDescription = "Login")
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Divider(Modifier.weight(1f))
+                    Text(text = "  Or  ", color = Color(0xFF9E9E9E))
+                    Divider(Modifier.weight(1f))
+                }
+
+                Spacer(Modifier.height(12.dp))
+                TextButton(
+                    onClick = onRegisterClick,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text(
+                        text = "Don’t have any account? Register here",
+                        color = purple,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

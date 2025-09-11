@@ -28,13 +28,11 @@ class MainActivity : ComponentActivity() {
                         onGetStarted = { screen = Screen.Login }
                     )
                     is Screen.Login -> LoginScreen(
-                        onLogin = { email, password ->
-                            // TODO: call your backend here later.
+                        onLoginSuccess = { access, refresh ->
+                            // TODO: Persist tokens with DataStore if you want.
                             screen = Screen.Home
                         },
-                        onRegisterClick = {
-                            // TODO: navigate to Register screen when you build it
-                        }
+                        onRegisterClick = { /* navigate to Register later */ }
                     )
                     is Screen.Home -> Greeting(name = "Android")
                 }
