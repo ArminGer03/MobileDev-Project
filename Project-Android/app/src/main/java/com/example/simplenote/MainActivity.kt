@@ -39,9 +39,9 @@ class MainActivity : ComponentActivity() {
 
                     is Screen.Register -> RegisterScreen(
                         onBackToLogin = { screen = Screen.Login },
-                        onRegistered = { _, _ ->
-                            // Option 1: simply go back to login after a successful registration
-                            screen = Screen.Login
+                        onRegistered = { username, email ->
+                            // optional: store for prefill, but DO NOT navigate here
+                            // lastRegisteredUsername = username
                         }
                     )
 

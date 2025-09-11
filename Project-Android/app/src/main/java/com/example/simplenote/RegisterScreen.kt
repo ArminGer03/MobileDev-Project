@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.simplenote.auth.RegisterViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun RegisterScreen(
@@ -63,7 +64,20 @@ fun RegisterScreen(
     }
 
     // navigate on success
-    LaunchedEffect(ui.success) { ui.success?.let { onRegistered(it.username, it.email) } }
+    LaunchedEffect(ui.success) {
+        ui.success?.let {
+            // 1) show success
+            snackbar.showSnackbar("Registration successful! Please log in.")
+            // 2) brief pause so user can see it
+            delay(600)
+            // 3) clear success so reopening Register won’t auto-bounce
+            vm.consumeSuccess()
+            // 4) (optional) let parent capture username/email for prefill
+            onRegistered(it.username, it.email)
+            // 5) now navigate back to Login
+            onBackToLogin()
+        }
+    }
 
     // global backend errors as snackbar (if any)
     LaunchedEffect(ui.error) {

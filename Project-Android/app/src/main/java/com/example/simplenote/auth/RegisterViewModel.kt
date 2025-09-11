@@ -60,4 +60,8 @@ class RegisterViewModel(
             uiState.value = uiState.value.copy(fieldErrors = cur)
         }
     }
+
+    fun consumeSuccess() {
+        uiState.value = uiState.value.copy(success = null)
+    }
 }
