@@ -8,7 +8,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.*
 
-private const val BASE_URL = "http://10.0.2.2:8000/"
+private const val BASE_URL = "https://simple.darkube.app/"
 
 // -------- Auth --------
 data class LoginRequest(val username: String, val password: String)
@@ -80,7 +80,7 @@ interface ApiService {
     @POST("api/auth/token/refresh/")
     suspend fun refresh(@Body body: RefreshRequest): RefreshResponse
 
-    @POST("api/auth/userinfo/")
+    @GET("api/auth/userinfo/")
     suspend fun getUserInfo(@Header("Authorization") auth: String): UserInfoResponse
 
     // Notes

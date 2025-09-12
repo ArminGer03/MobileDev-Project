@@ -97,7 +97,8 @@ class MainActivity : ComponentActivity() {
                         onLogoutSuccess = {
                             accessToken = null
                             screen = Screen.Login
-                        }
+                        },
+                        onBack = { screen = Screen.Home }
                     )
 
                     is Screen.ChangePassword -> ChangePasswordScreen(
