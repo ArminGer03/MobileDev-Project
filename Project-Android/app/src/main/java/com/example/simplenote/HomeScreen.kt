@@ -53,6 +53,8 @@ fun HomeScreen(
     val bg = Color(0xFFFAF8FC)
     val purple = Color(0xFF504EC3)
     var selectedTab by remember { mutableStateOf(0) } // 0=Home, 1=Settings
+    val fabSize = 72.dp      // your FAB diameter
+    val barHeight = 80.dp    // your bottom bar height
 
     // Load first page on entry
     LaunchedEffect(accessToken) { vm.init(accessToken) }
@@ -70,34 +72,62 @@ fun HomeScreen(
 
     Scaffold(
         containerColor = bg,
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddNote,
-                containerColor = purple,
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier.size(64.dp)
-            ) { Icon(Icons.Filled.Add, contentDescription = "Add") }
-        },
-        floatingActionButtonPosition = FabPosition.Center,
+        // REMOVE floatingActionButton & floatingActionButtonPosition here
+
         bottomBar = {
-            NavigationBar(containerColor = Color.White) {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = {
-                        if (selectedTab == 0) vm.refresh(accessToken) // tap-to-refresh
-                        selectedTab = 0
-                    },
-                    icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
-                    label = { Text("Home") }
+            val fabSize = 72.dp          // pick your diameter
+            val barHeight = 80.dp        // your bottom bar height
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(barHeight)
+            ) {
+                // Top hairline
+                Divider(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter),
+                    color = Color(0x1A000000),
+                    thickness = 1.dp
                 )
-                Spacer(Modifier.weight(1f))
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1; onOpenSettings() },
-                    icon = { Icon(Icons.Outlined.Settings, contentDescription = "Settings") },
-                    label = { Text("Settings") }
-                )
+
+                // The actual bottom nav
+                NavigationBar(
+                    containerColor = Color.White,
+                    modifier = Modifier.matchParentSize()
+                ) {
+                    NavigationBarItem(
+                        selected = selectedTab == 0,
+                        onClick = {
+                            if (selectedTab == 0) vm.refresh(accessToken)
+                            selectedTab = 0
+                        },
+                        icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
+                        label = { Text("Home") }
+                    )
+                    Spacer(Modifier.weight(1f)) // leaves room under centered FAB
+                    NavigationBarItem(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1; onOpenSettings() },
+                        icon = { Icon(Icons.Outlined.Settings, contentDescription = "Settings") },
+                        label = { Text("Settings") }
+                    )
+                }
+
+                // ---- Docked FAB: center exactly on the top border ----
+                FloatingActionButton(
+                    onClick = onAddNote,
+                    containerColor = purple,
+                    contentColor = Color.White,
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .size(fabSize)
+                        .align(Alignment.TopCenter)
+                        .offset(y = -fabSize / 2)   // center of FAB sits on the bar's top edge
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add", modifier = Modifier.size(28.dp))
+                }
             }
         }
     ) { inner ->
@@ -190,7 +220,7 @@ fun HomeScreen(
                             items((1..totalPages).toList(), key = { it }) { page ->
                                 Box(
                                     modifier = Modifier
-                                        .width(pageWidth)       // full screen width page
+                                        .fillParentMaxWidth()   // ✅ exactly the LazyRow viewport width (respects outer padding)
                                         .fillMaxHeight()
                                 ) {
                                     val pageNotes = ui.pages[page].orEmpty()
@@ -218,12 +248,10 @@ fun HomeScreen(
                         PageIndicator(
                             total = totalPages,
                             current = visiblePage,
-                            onDotClick = { target ->
-                                scope.launch { listState.animateScrollToItem(target - 1) }
-                            },
+                            onDotClick = { target -> scope.launch { listState.animateScrollToItem(target - 1) } },
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = 72.dp) // sits above FAB + nav bar
+                                .padding(bottom = fabSize / 4 + 5.dp)
                         )
                     }
 
@@ -245,7 +273,10 @@ private fun NotesGridPage(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
+        contentPadding = PaddingValues(
+            top = 0.dp,
+            bottom = 72.dp / 2 + 24.dp   // room for FAB and a little breathing space
+        )
     ) {
         items(notes, key = { it.id }) { note ->
             NoteCard(note = note, bg = Color(0xFFFFF6C5)) { onClick(note.id) }
