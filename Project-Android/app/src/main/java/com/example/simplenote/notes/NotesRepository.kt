@@ -29,4 +29,7 @@ class NotesRepository {
         } while (hasNext)
         return out
     }
+
+    suspend fun getNote(token: String, id: Long): NoteDto =
+        ApiClient.api.getNote(id, "Bearer $token")
 }

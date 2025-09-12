@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.simplenote.notes.NoteEditorViewModel
+import com.example.simplenote.notes.NotesRepository
 import kotlinx.coroutines.delay
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -31,7 +32,8 @@ import java.time.format.DateTimeFormatter
 fun NoteEditorScreen(
     accessToken: String,
     onBack: () -> Unit,
-    onSavedAndExit: () -> Unit, // after delete or exit
+    onSavedAndExit: () -> Unit,
+    existingNoteId: Long? = null,
     vm: NoteEditorViewModel = viewModel()
 ) {
     val ui = vm.uiState.value
@@ -45,6 +47,19 @@ fun NoteEditorScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     fun touchEdited() { lastEdited = LocalTime.now() }
+
+    LaunchedEffect(existingNoteId) {
+        existingNoteId?.let { id ->
+            try {
+                val dto = NotesRepository().getNote(accessToken, id)
+                noteId = dto.id
+                title = dto.title
+                body = dto.description
+            } catch (e: Exception) {
+                snackbar.showSnackbar("Failed to load note")
+            }
+        }
+    }
 
     // -------- AUTOSAVE (debounced) --------
     LaunchedEffect(title, body) {
@@ -63,6 +78,7 @@ fun NoteEditorScreen(
             vm.consumeSaved()
         }
     }
+
     // Global/backend error
     LaunchedEffect(ui.error) {
         ui.error?.let {

@@ -58,6 +58,12 @@ interface ApiService {
     suspend fun register(@Body body: RegisterRequest): RegisterResponse
 
     // Notes
+    @GET("api/notes/{id}/")
+    suspend fun getNote(
+        @Path("id") id: Long,
+        @Header("Authorization") auth: String
+    ): NoteDto
+
     @POST("api/notes/")
     suspend fun createNote(
         @Body body: CreateNoteRequest,

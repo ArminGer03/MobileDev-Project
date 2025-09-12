@@ -20,7 +20,7 @@ class HomeViewModel(
     var uiState = androidx.compose.runtime.mutableStateOf(HomeUiState())
         private set
 
-    fun loadNotes(token: String, allPages: Boolean = false) {
+    fun loadNotes(token: String, allPages: Boolean = true) {
         uiState.value = HomeUiState(loading = true)
         viewModelScope.launch {
             try {

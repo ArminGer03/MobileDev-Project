@@ -45,7 +45,7 @@ fun HomeScreen(
     var query by remember { mutableStateOf("") }
 
     // Load once per token
-    LaunchedEffect(accessToken) { vm.loadNotes(accessToken) }
+    LaunchedEffect(accessToken) { vm.loadNotes(accessToken, allPages = true) }
     val ui = vm.uiState.value
 
     Scaffold(
@@ -90,12 +90,12 @@ fun HomeScreen(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                placeholder = { Text("Search…") },
+                placeholder = { Text("Search…", maxLines = 1) },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .heightIn(min = 56.dp) // Material3 default min height, no cropping
             )
 
             Spacer(Modifier.height(10.dp))
@@ -128,16 +128,17 @@ fun HomeScreen(
 
                     val filtered: List<NoteDto> = ui.notes.filter { n ->
                         val q = query.trim().lowercase()
-                        if (q.isBlank()) true
-                        else (n.title.lowercase().contains(q) ||
-                                n.description.lowercase().contains(q))
+                        q.isBlank() || n.title.lowercase().contains(q) || n.description.lowercase().contains(q)
                     }
 
-                    NotesGrid(
-                        notes = filtered,
-                        onClick = onOpenNote,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    // Give the grid weight so it can scroll beyond 2 cards
+                    Box(Modifier.weight(1f)) {
+                        NotesGrid(
+                            notes = filtered,
+                            onClick = onOpenNote,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
