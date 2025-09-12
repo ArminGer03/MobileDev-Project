@@ -42,10 +42,7 @@ fun SettingsScreen(
     // Load user info
     LaunchedEffect(Unit) { vm.loadUserInfo() }
 
-    // Navigate back to login if logged out
-    LaunchedEffect(ui.loggedOut) {
-        if (ui.loggedOut) onLogoutSuccess()
-    }
+
 
     Scaffold(
         topBar = {

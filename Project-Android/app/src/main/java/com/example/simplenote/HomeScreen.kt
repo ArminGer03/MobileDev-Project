@@ -46,7 +46,6 @@ fun HomeScreen(
     onAddNote: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNote: (Long) -> Unit,
-    username: String? = null,
     vm: HomeViewModel = viewModel()
 ) {
     val bg = Color(0xFFFAF8FC)
@@ -157,8 +156,7 @@ fun HomeScreen(
                     EmptyState(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(top = 8.dp),
-                        username = username
+                            .padding(top = 8.dp)
                     )
                 }
 
@@ -377,7 +375,7 @@ private fun PageIndicator(
 
 // ---------- Empty state (same as before) ----------
 @Composable
-private fun EmptyState(modifier: Modifier = Modifier, username: String?) {
+private fun EmptyState(modifier: Modifier = Modifier) {
     val textDark = Color(0xFF1C1B1F)
     val textMute = Color(0xFF7D7A85)
 

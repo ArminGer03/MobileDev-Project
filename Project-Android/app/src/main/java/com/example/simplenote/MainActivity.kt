@@ -1,6 +1,7 @@
 package com.example.simplenote
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
@@ -8,8 +9,10 @@ import com.example.simplenote.ui.theme.SimpleNoteTheme
 import java.util.UUID
 import androidx.compose.material3.Text
 import androidx.lifecycle.lifecycleScope
+import com.example.simplenote.auth.AuthState
+import com.example.simplenote.network.ApiClient
 import kotlinx.coroutines.launch
-import com.example.simplenote.auth.TokenManager
+import com.example.simplenote.network.TokenManager
 
 class MainActivity : ComponentActivity() {
 
@@ -36,16 +39,44 @@ class MainActivity : ComponentActivity() {
 
             SimpleNoteTheme {
                 var screen by remember { mutableStateOf<Screen>(Screen.Onboarding) }
-                val accessToken by tokenManager.accessToken.collectAsState(initial = null)
-                var lastRegisteredUsername by remember { mutableStateOf<String?>(null) }
+                var ready by remember { mutableStateOf(false) }
+                val coroutineScope = rememberCoroutineScope()
 
-                LaunchedEffect(accessToken) {
-                    screen = if (accessToken.isNullOrEmpty()) {
-                        Screen.Login
-                    } else {
-                        Screen.Home
+                val loggedOut by AuthState.loggedOut.collectAsState()
+                LaunchedEffect(loggedOut) {
+                    if (loggedOut) {
+                        screen = Screen.Login
+                        AuthState.reset()
                     }
                 }
+
+                LaunchedEffect(Unit) {
+                    coroutineScope.launch {
+                        val refresh = tokenManager.getRefreshToken()
+                        val access = tokenManager.getAccessToken()
+                        Log.d("MainActivity", "Startup tokens: access=${access?.take(10)}..., refresh=${refresh?.take(10)}...")
+
+                        if (!refresh.isNullOrBlank() && !access.isNullOrBlank()) {
+                            try {
+                                val user = ApiClient.api.getUserInfo()
+                                Log.i("MainActivity", "✅ getUserInfo success for ${user.email}")
+                                screen = Screen.Home
+                            } catch (e: Exception) {
+                                    Log.e("MainActivity", "❌ getUserInfo failed: ${e.message}", e)
+                                tokenManager.clear()
+                                AuthState.triggerLogout()
+                                screen = Screen.Login
+                            }
+                        } else {
+                            Log.w("MainActivity", "No tokens → going to login")
+                            screen = Screen.Login
+                        }
+                        ready = true
+                    }
+                }
+
+
+                if (!ready) return@SimpleNoteTheme
 
 
                 when (val s = screen) {
@@ -81,7 +112,6 @@ class MainActivity : ComponentActivity() {
                             editorSessionKey = "edit-$id"
                             screen = Screen.EditNote(id)
                         },
-                        username = lastRegisteredUsername
                     )
 
 
@@ -108,7 +138,7 @@ class MainActivity : ComponentActivity() {
                         onChangePassword = { screen = Screen.ChangePassword },
                         onLogoutSuccess = {
                             lifecycleScope.launch {
-                                tokenManager.clearTokens()
+                                tokenManager.clear()
                             }
                             screen = Screen.Login
 
