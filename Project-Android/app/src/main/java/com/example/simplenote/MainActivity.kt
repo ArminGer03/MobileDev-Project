@@ -18,7 +18,10 @@ class MainActivity : ComponentActivity() {
         data class Detail(val noteId: String) : Screen()
         data object NewNote : Screen()
         data class EditNote(val id: Long) : Screen()
+        data object Settings : Screen()
+        data object ChangePassword : Screen()
     }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,16 +58,17 @@ class MainActivity : ComponentActivity() {
                     is Screen.Home -> HomeScreen(
                         accessToken = accessToken.orEmpty(),
                         onAddNote = {
-                            editorSessionKey = UUID.randomUUID().toString()        // NEW session
+                            editorSessionKey = UUID.randomUUID().toString()
                             screen = Screen.NewNote
                         },
-                        onOpenSettings = { /* ... */ },
+                        onOpenSettings = { screen = Screen.Settings },
                         onOpenNote = { id ->
-                            editorSessionKey = "edit-$id"                          // stable per note
+                            editorSessionKey = "edit-$id"
                             screen = Screen.EditNote(id)
                         },
                         username = lastRegisteredUsername
                     )
+
 
                     is Screen.NewNote -> NoteEditorScreen(
                         accessToken = accessToken.orEmpty(),
@@ -86,6 +90,23 @@ class MainActivity : ComponentActivity() {
                         // TODO: Note details screen (not part of this step)
                         Text("Note detail: ${s.noteId}")
                     }
+
+                    is Screen.Settings -> SettingsScreen(
+                        accessToken = accessToken.orEmpty(),
+                        onChangePassword = { screen = Screen.ChangePassword },
+                        onLogoutSuccess = {
+                            accessToken = null
+                            screen = Screen.Login
+                        }
+                    )
+
+                    is Screen.ChangePassword -> ChangePasswordScreen(
+                        accessToken = accessToken.orEmpty(),
+                        onPasswordChanged = { screen = Screen.Settings },
+                        onBack = { screen = Screen.Settings }
+                    )
+
+
                 }
             }
         }
