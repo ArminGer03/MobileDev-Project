@@ -1,12 +1,17 @@
 package com.example.simplenote
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,19 +23,30 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.simplenote.home.HomeViewModel
+import com.example.simplenote.network.NoteDto
 
 @Composable
 fun HomeScreen(
+    accessToken: String,
     onAddNote: () -> Unit,
     onOpenSettings: () -> Unit,
-    username: String? = null
+    onOpenNote: (Long) -> Unit = {},
+    username: String? = null,
+    vm: HomeViewModel = viewModel()
 ) {
     val bg = Color(0xFFFAF8FC)
     val purple = Color(0xFF504EC3)
-
     var selectedTab by remember { mutableStateOf(0) } // 0=Home, 1=Settings
+    var query by remember { mutableStateOf("") }
+
+    // Load once per token
+    LaunchedEffect(accessToken) { vm.loadNotes(accessToken) }
+    val ui = vm.uiState.value
 
     Scaffold(
         containerColor = bg,
@@ -52,7 +68,7 @@ fun HomeScreen(
                     icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
                     label = { Text("Home") }
                 )
-                Spacer(Modifier.weight(1f)) // space under FAB
+                Spacer(Modifier.weight(1f))
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1; onOpenSettings() },
@@ -62,16 +78,127 @@ fun HomeScreen(
             }
         }
     ) { inner ->
-        EmptyState(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(inner)
-                .systemBarsPadding(),
-            username = username
-        )
+                .systemBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
+            // Search (always visible)
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
+                placeholder = { Text("Search…") },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            when {
+                ui.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                ui.error != null -> Text(
+                    text = ui.error ?: "",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(16.dp)
+                )
+                ui.notes.isEmpty() -> {
+                    EmptyState(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 8.dp),
+                        username = username
+                    )
+                }
+                else -> {
+                    Text(
+                        text = "Notes",
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    val filtered: List<NoteDto> = ui.notes.filter { n ->
+                        val q = query.trim().lowercase()
+                        if (q.isBlank()) true
+                        else (n.title.lowercase().contains(q) ||
+                                n.description.lowercase().contains(q))
+                    }
+
+                    NotesGrid(
+                        notes = filtered,
+                        onClick = onOpenNote,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
     }
 }
 
+@Composable
+private fun NotesGrid(
+    notes: List<NoteDto>,
+    onClick: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 96.dp)
+    ) {
+        itemsIndexed(notes, key = { _, n -> n.id }) { index, note ->
+            val cardColor =
+                if (index % 2 == 0) Color(0xFFFFF6C5) else Color(0xFFFFEDB3) // soft yellows
+            NoteCard(note = note, bg = cardColor, onClick = { onClick(note.id) })
+        }
+    }
+}
+
+@Composable
+private fun NoteCard(note: NoteDto, bg: Color, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = bg,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 160.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text(
+                text = "💡 ${note.title}",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = note.description,
+                fontSize = 13.sp,
+                color = Color(0xFF5A5761),
+                maxLines = 6,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+// ---------- Empty state (unchanged) ----------
 @Composable
 private fun EmptyState(modifier: Modifier = Modifier, username: String?) {
     val textDark = Color(0xFF1C1B1F)
@@ -83,8 +210,6 @@ private fun EmptyState(modifier: Modifier = Modifier, username: String?) {
         verticalArrangement = Arrangement.Top
     ) {
         Spacer(Modifier.height(24.dp))
-
-        // Illustration (put your asset in res/drawable as home_empty_illustration.png)
         runCatching {
             Image(
                 painter = painterResource(id = R.drawable.home_empty_illustration),
@@ -95,9 +220,7 @@ private fun EmptyState(modifier: Modifier = Modifier, username: String?) {
                 contentScale = ContentScale.Fit
             )
         }
-
         Spacer(Modifier.height(16.dp))
-
         Text(
             text = "Start Your Journey",
             fontSize = 24.sp,
@@ -112,10 +235,7 @@ private fun EmptyState(modifier: Modifier = Modifier, username: String?) {
             color = textMute,
             textAlign = TextAlign.Center
         )
-
         Spacer(Modifier.height(36.dp))
-
-        // Optional curved arrow image pointing to the FAB
         runCatching {
             Image(
                 painter = painterResource(id = R.drawable.arrow_curved),

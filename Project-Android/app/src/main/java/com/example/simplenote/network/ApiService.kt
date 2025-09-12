@@ -6,12 +6,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
-import retrofit2.http.Body
-import retrofit2.http.DELETE
-import retrofit2.http.Header
-import retrofit2.http.PATCH
-import retrofit2.http.POST
-import retrofit2.http.Path
+import retrofit2.http.*
 
 private const val BASE_URL = "http://10.0.2.2:8000/"
 
@@ -47,6 +42,13 @@ data class NoteDto(
     val creator_username: String?
 )
 
+data class PagedNotesResponse(
+    val count: Int,
+    val next: String?,
+    val previous: String?,
+    val results: List<NoteDto>
+)
+
 interface ApiService {
     // Auth
     @POST("api/auth/token/")
@@ -74,6 +76,13 @@ interface ApiService {
         @Path("id") id: Long,
         @Header("Authorization") auth: String
     )
+
+    @GET("api/notes/")
+    suspend fun listNotesPaged(
+        @Header("Authorization") auth: String,
+        @Query("page") page: Int? = null,
+        @Query("page_size") pageSize: Int? = null
+    ): PagedNotesResponse
 }
 
 object ApiClient {

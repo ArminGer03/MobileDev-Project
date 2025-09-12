@@ -1,37 +1,34 @@
+// app/src/main/java/com/example/simplenote/home/HomeViewModel.kt
 package com.example.simplenote.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import com.example.simplenote.network.NoteDto
+import com.example.simplenote.notes.NotesRepository
 import kotlinx.coroutines.launch
 
-class HomeViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow(HomeUiState())
-    val uiState: StateFlow<HomeUiState> = _uiState
+data class HomeUiState(
+    val loading: Boolean = false,
+    val error: String? = null,
+    val notes: List<NoteDto> = emptyList()
+)
 
-    fun loadNotes() {
+class HomeViewModel(
+    private val repo: NotesRepository = NotesRepository()
+) : ViewModel() {
+
+    var uiState = androidx.compose.runtime.mutableStateOf(HomeUiState())
+        private set
+
+    fun loadNotes(token: String, allPages: Boolean = false) {
+        uiState.value = HomeUiState(loading = true)
         viewModelScope.launch {
-            _uiState.value = HomeUiState(loading = true)
-            // TODO: replace with real API call using your access token
-            // Simulate latency + sample data
-            delay(500)
-            val sample = listOf(
-                Note(
-                    id = "1",
-                    title = "Welcome to SimpleNote",
-                    body = "Tap the + button to create, edit, and organize your ideas.",
-                    prettyDate = "Today"
-                ),
-                Note(
-                    id = "2",
-                    title = "Design meeting",
-                    body = "Draft agenda: onboarding flow, empty states, and error handling.",
-                    prettyDate = "Yesterday"
-                )
-            )
-            _uiState.value = HomeUiState(notes = sample)
+            try {
+                val list = if (allPages) repo.listAllNotes(token) else repo.listNotesFirstPage(token)
+                uiState.value = HomeUiState(notes = list)
+            } catch (e: Exception) {
+                uiState.value = HomeUiState(error = e.message ?: "Failed to load notes")
+            }
         }
     }
 }

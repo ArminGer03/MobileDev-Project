@@ -53,7 +53,8 @@ class MainActivity : ComponentActivity() {
                     is Screen.Home -> HomeScreen(
                         onAddNote = { screen = Screen.NewNote },
                         onOpenSettings = { /* ... */ },
-                        username = lastRegisteredUsername
+                        username = lastRegisteredUsername,
+                        accessToken = accessToken.orEmpty()
                     )
 
                     is Screen.NewNote -> NoteEditorScreen(
