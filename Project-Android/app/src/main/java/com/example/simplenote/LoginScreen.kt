@@ -49,7 +49,12 @@ fun LoginScreen(
     }
 
     // success / backend error
-    LaunchedEffect(ui.token) { ui.token?.let { onLoginSuccess(it.access, it.refresh) } }
+    LaunchedEffect(ui.token) {
+        ui.token?.let {
+            onLoginSuccess(it.access, it.refresh)
+            vm.clearTokens()
+        }
+    }
     LaunchedEffect(ui.error) {
         ui.error?.let {
             snackbarHostState.showSnackbar(it)

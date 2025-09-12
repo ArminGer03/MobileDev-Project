@@ -33,5 +33,12 @@ class AuthViewModel(
         }
     }
 
-    fun clearError() { uiState.value = uiState.value.copy(error = null) }
+    fun clearError() {
+        uiState.value = uiState.value.copy(error = null)
+    }
+
+    fun clearTokens() {
+        uiState.value = uiState.value.copy(token = null)
+    }
+
 }

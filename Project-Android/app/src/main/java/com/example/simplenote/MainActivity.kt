@@ -34,6 +34,11 @@ class MainActivity : ComponentActivity() {
                 var accessToken by remember { mutableStateOf<String?>(null) }
                 var lastRegisteredUsername by remember { mutableStateOf<String?>(null) }
 
+                LaunchedEffect(accessToken) {
+                    if (accessToken == null) {
+                        screen = Screen.Onboarding
+                    }
+                }
                 when (val s = screen) {
                     is Screen.Onboarding -> OnboardingScreen(
                         onGetStarted = { screen = Screen.Login }
