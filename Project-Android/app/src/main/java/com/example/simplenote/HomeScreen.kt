@@ -29,6 +29,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.simplenote.home.HomeViewModel
 import com.example.simplenote.network.NoteDto
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
+
 
 @Composable
 fun HomeScreen(
@@ -43,6 +47,18 @@ fun HomeScreen(
     val purple = Color(0xFF504EC3)
     var selectedTab by remember { mutableStateOf(0) } // 0=Home, 1=Settings
     var query by remember { mutableStateOf("") }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, accessToken) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                vm.loadNotes(accessToken, allPages = true)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
 
     // Load once per token
     LaunchedEffect(accessToken) { vm.loadNotes(accessToken, allPages = true) }
@@ -65,9 +81,7 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = {
-                        if (selectedTab == 0) {
-                            vm.loadNotes(accessToken, allPages = true)
-                        }
+                        if (selectedTab == 0) vm.loadNotes(accessToken, allPages = true) // manual refresh
                         selectedTab = 0
                     },
                     icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },

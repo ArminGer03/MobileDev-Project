@@ -31,23 +31,35 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun NoteEditorScreen(
     accessToken: String,
+    sessionKey: String,
     onBack: () -> Unit,
     onSavedAndExit: () -> Unit,
     existingNoteId: Long? = null,
-    vm: NoteEditorViewModel = viewModel()
+    vm: NoteEditorViewModel = viewModel(key = "editor-$sessionKey") // <-- key the VM
 ) {
     val ui = vm.uiState.value
     val purple = Color(0xFF504EC3)
     val snackbar = remember { SnackbarHostState() }
 
-    var noteId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var title by rememberSaveable { mutableStateOf("") }
-    var body by rememberSaveable { mutableStateOf("") }
+    // Key the local state to sessionKey so a fresh editor doesn't reuse old fields
+    var noteId by rememberSaveable(sessionKey) { mutableStateOf<Long?>(null) }
+    var title by rememberSaveable(sessionKey) { mutableStateOf("") }
+    var body by rememberSaveable(sessionKey) { mutableStateOf("") }
     var lastEdited by remember { mutableStateOf(LocalTime.now()) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     fun touchEdited() { lastEdited = LocalTime.now() }
 
+    // If this is a NEW note session, ensure fields are blank (hard reset on new key)
+    LaunchedEffect(sessionKey) {
+        if (existingNoteId == null) {
+            noteId = null
+            title = ""
+            body = ""
+        }
+    }
+
+    // Prefill for existing note (unchanged)
     LaunchedEffect(existingNoteId) {
         existingNoteId?.let { id ->
             try {
@@ -61,15 +73,15 @@ fun NoteEditorScreen(
         }
     }
 
-    // -------- AUTOSAVE (debounced) --------
+    // AUTOSAVE (unchanged)
     LaunchedEffect(title, body) {
         if (title.isBlank() && body.isBlank()) return@LaunchedEffect
         touchEdited()
-        delay(900) // debounce typing
+        delay(900)
         vm.saveOrUpdate(accessToken, noteId, title.trim(), body.trim())
     }
 
-    // Save result
+    // Save result (unchanged)
     LaunchedEffect(ui.savedNoteId) {
         ui.savedNoteId?.let {
             noteId = it

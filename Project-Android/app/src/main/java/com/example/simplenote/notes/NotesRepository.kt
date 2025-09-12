@@ -16,19 +16,29 @@ class NotesRepository {
     suspend fun listNotesFirstPage(token: String, pageSize: Int = 50): List<NoteDto> =
         ApiClient.api.listNotesPaged("Bearer $token", page = 1, pageSize = pageSize).results
 
-    // (Optional) ALL pages – follow page numbers until 'next' is null
-    suspend fun listAllNotes(token: String, pageSize: Int = 50): List<NoteDto> {
+    // NotesRepository.kt
+    suspend fun listAllNotes(token: String, pageSize: Int = 100): List<NoteDto> {
         val out = mutableListOf<NoteDto>()
         var page = 1
-        var hasNext: Boolean
+        var nextUrl: String? = null
+
         do {
-            val resp = ApiClient.api.listNotesPaged("Bearer $token", page = page, pageSize = pageSize)
+            val resp = ApiClient.api.listNotesPaged(
+                "Bearer $token",
+                page = page,
+                pageSize = pageSize
+            )
             out += resp.results
-            hasNext = resp.next != null
-            page += 1
-        } while (hasNext)
+            nextUrl = resp.next
+            // If server returns an absolute next URL like "...?page=3", follow it;
+            // otherwise just increment page.
+            val nextPage = nextUrl?.substringAfter("page=")?.substringBefore("&")?.toIntOrNull()
+            page = nextPage ?: (page + 1)
+        } while (nextUrl != null)
+
         return out
     }
+
 
     suspend fun getNote(token: String, id: Long): NoteDto =
         ApiClient.api.getNote(id, "Bearer $token")

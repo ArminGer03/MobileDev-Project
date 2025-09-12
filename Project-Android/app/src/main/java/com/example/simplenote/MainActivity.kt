@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import com.example.simplenote.ui.theme.SimpleNoteTheme
-
+import java.util.UUID
 import androidx.compose.material3.Text
 
 class MainActivity : ComponentActivity() {
@@ -24,6 +24,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
+            var editorSessionKey by remember { mutableStateOf<String?>(null) }
+
             SimpleNoteTheme {
                 var screen by remember { mutableStateOf<Screen>(Screen.Onboarding) }
                 var accessToken by remember { mutableStateOf<String?>(null) }
@@ -52,20 +54,29 @@ class MainActivity : ComponentActivity() {
 
                     is Screen.Home -> HomeScreen(
                         accessToken = accessToken.orEmpty(),
-                        onAddNote = { screen = Screen.NewNote },
-                        onOpenSettings = { /* … */ },
-                        onOpenNote = { id -> screen = Screen.EditNote(id) },   // <-- open editor
+                        onAddNote = {
+                            editorSessionKey = UUID.randomUUID().toString()        // NEW session
+                            screen = Screen.NewNote
+                        },
+                        onOpenSettings = { /* ... */ },
+                        onOpenNote = { id ->
+                            editorSessionKey = "edit-$id"                          // stable per note
+                            screen = Screen.EditNote(id)
+                        },
                         username = lastRegisteredUsername
                     )
 
                     is Screen.NewNote -> NoteEditorScreen(
                         accessToken = accessToken.orEmpty(),
+                        sessionKey = editorSessionKey ?: UUID.randomUUID().toString(), // pass key
+                        existingNoteId = null,
                         onBack = { screen = Screen.Home },
                         onSavedAndExit = { screen = Screen.Home }
                     )
 
                     is Screen.EditNote -> NoteEditorScreen(
                         accessToken = accessToken.orEmpty(),
+                        sessionKey = editorSessionKey ?: "edit-${(screen as Screen.EditNote).id}",
                         existingNoteId = (screen as Screen.EditNote).id,
                         onBack = { screen = Screen.Home },
                         onSavedAndExit = { screen = Screen.Home }
