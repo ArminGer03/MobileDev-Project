@@ -10,10 +10,10 @@ import retrofit2.http.*
 
 
 // for deployed use case
-//private const val BASE_URL = "https://simple.darkube.app/"
+private const val BASE_URL = "https://simple.darkube.app/"
 
-// for local production development
-private const val BASE_URL = "http://10.0.2.2:8000/"
+//// for local production development
+//private const val BASE_URL = "http://10.0.2.2:8000/"
 
 
 // -------- Auth --------

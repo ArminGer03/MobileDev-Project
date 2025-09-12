@@ -3,17 +3,23 @@ package com.example.simplenote
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -21,24 +27,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.simplenote.database.NotesDatabase
+import com.example.simplenote.home.HomeViewModel
+import com.example.simplenote.home.HomeViewModelFactory
 import com.example.simplenote.notes.NoteEditorViewModel
+import com.example.simplenote.notes.NoteEditorViewModelFactory
 import com.example.simplenote.notes.NotesRepository
 import kotlinx.coroutines.delay
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DeleteForever
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.unit.Dp
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,14 +44,22 @@ fun NoteEditorScreen(
     sessionKey: String,
     onBack: () -> Unit,
     onSavedAndExit: () -> Unit,
-    existingNoteId: Long? = null,
-    vm: NoteEditorViewModel = viewModel(key = "editor-$sessionKey") // <-- key the VM
+    existingNoteId: Long? = null
 ) {
+
+    val context = LocalContext.current
+    val dao = remember { NotesDatabase.getInstance(context).noteDao() }
+    val repo = remember { NotesRepository(dao) }
+
+    // Use both key and factory
+    val vm: NoteEditorViewModel = viewModel(
+        key = "editor-$sessionKey",
+        factory = NoteEditorViewModelFactory(repo)
+    )
     val ui = vm.uiState.value
     val purple = Color(0xFF504EC3)
     val snackbar = remember { SnackbarHostState() }
 
-    // Key the local state to sessionKey so a fresh editor doesn't reuse old fields
     var noteId by rememberSaveable(sessionKey) { mutableStateOf<Long?>(null) }
     var title by rememberSaveable(sessionKey) { mutableStateOf("") }
     var body by rememberSaveable(sessionKey) { mutableStateOf("") }
@@ -63,30 +68,23 @@ fun NoteEditorScreen(
 
     fun touchEdited() { lastEdited = LocalTime.now() }
 
-    // If this is a NEW note session, ensure fields are blank (hard reset on new key)
-    LaunchedEffect(sessionKey) {
-        if (existingNoteId == null) {
-            noteId = null
-            title = ""
-            body = ""
-        }
-    }
-
-    // Prefill for existing note (unchanged)
+    // Load note from local DB if editing
     LaunchedEffect(existingNoteId) {
         existingNoteId?.let { id ->
-            try {
-                val dto = NotesRepository().getNote(accessToken, id)
-                noteId = dto.id
-                title = dto.title
-                body = dto.description
-            } catch (e: Exception) {
-                snackbar.showSnackbar("Failed to load note")
+            // For offline-first: just fetch from repo (Room)
+            // You can expose a suspend getNoteById() from repository
+            val localNote = vm.repo.getNoteById(id)
+            if (localNote != null) {
+                noteId = localNote.id
+                title = localNote.title
+                body = localNote.description
+            } else {
+                snackbar.showSnackbar("Note not found locally")
             }
         }
     }
 
-    // AUTOSAVE (unchanged)
+    // Autosave when user stops typing
     LaunchedEffect(title, body) {
         if (title.isBlank() && body.isBlank()) return@LaunchedEffect
         touchEdited()
@@ -94,17 +92,17 @@ fun NoteEditorScreen(
         vm.saveOrUpdate(accessToken, noteId, title.trim(), body.trim())
     }
 
-    // Save result (unchanged)
+    // Update UI when note is saved (sync may run later)
     LaunchedEffect(ui.savedNoteId) {
         ui.savedNoteId?.let {
             noteId = it
-            snackbar.showSnackbar("Saved")
+            snackbar.showSnackbar("Saved locally")
             delay(400)
             vm.consumeSaved()
         }
     }
 
-    // Global/backend error
+    // Show error snackbar if sync or DB fails
     LaunchedEffect(ui.error) {
         ui.error?.let {
             snackbar.showSnackbar(it)
@@ -140,7 +138,7 @@ fun NoteEditorScreen(
         ) {
             Divider(color = Color(0x1F000000))
 
-            // -------- Title (large) with placeholder --------
+            // -------- Title --------
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -175,10 +173,15 @@ fun NoteEditorScreen(
                 )
             }
             ui.fieldErrors["title"]?.forEach {
-                Text("• $it", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, bottom = 4.dp))
+                Text(
+                    "• $it",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
+                )
             }
 
-            // -------- Body (multiline) with placeholder --------
+            // -------- Body --------
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -198,18 +201,27 @@ fun NoteEditorScreen(
                         body = it
                         vm.clearFieldErrors("description")
                     },
-                    textStyle = TextStyle(fontSize = 16.sp, color = Color(0xFF3D3A45), lineHeight = 22.sp),
+                    textStyle = TextStyle(
+                        fontSize = 16.sp,
+                        color = Color(0xFF3D3A45),
+                        lineHeight = 22.sp
+                    ),
                     modifier = Modifier.fillMaxSize()
                 )
             }
             ui.fieldErrors["description"]?.forEach {
-                Text("• $it", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, bottom = 4.dp))
+                Text(
+                    "• $it",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
+                )
             }
 
             Spacer(Modifier.height(4.dp))
             Divider(color = Color(0x14000000))
 
-            // -------- Bottom bar: last edited + trash --------
+            // -------- Bottom bar --------
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -238,18 +250,17 @@ fun NoteEditorScreen(
         }
     }
 
-    // Confirm delete dialog
     if (showDeleteSheet) {
         DeleteNoteSheet(
             onDismiss = { showDeleteSheet = false },
             onDelete = {
-                val id = noteId
-                if (id != null) vm.delete(accessToken, id) { onSavedAndExit() }
+                noteId?.let { id ->
+                    vm.delete(accessToken, id) { onSavedAndExit() }
+                }
             }
         )
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -264,14 +275,13 @@ private fun DeleteNoteSheet(
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         containerColor = Color.White,
-        dragHandle = null // Figma shows no handle
+        dragHandle = null
     ) {
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // Header row: title + close chip
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -299,7 +309,6 @@ private fun DeleteNoteSheet(
             Divider(color = Color(0x14000000))
             Spacer(Modifier.height(6.dp))
 
-            // Destructive action row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

@@ -39,4 +39,11 @@ class SettingsViewModel(
     fun clearError() {
         uiState.value = uiState.value.copy(error = null)
     }
+
+
+    fun clearLogout() {
+        uiState.value = uiState.value.copy(loggedOut = false)
+    }
+
+
 }
