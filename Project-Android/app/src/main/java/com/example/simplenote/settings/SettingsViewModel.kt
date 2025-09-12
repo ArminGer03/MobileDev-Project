@@ -19,11 +19,11 @@ class SettingsViewModel(
     var uiState = androidx.compose.runtime.mutableStateOf(SettingsUiState())
         private set
 
-    fun loadUserInfo(accessToken: String) {
+    fun loadUserInfo() {
         uiState.value = SettingsUiState(loading = true)
         viewModelScope.launch {
             try {
-                val user = repo.getUserInfo(accessToken)
+                val user = repo.getUserInfo()
                 uiState.value = SettingsUiState(user = user)
             } catch (e: Exception) {
                 uiState.value = SettingsUiState(error = e.message ?: "Failed to load user info")

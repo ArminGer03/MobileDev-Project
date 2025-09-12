@@ -20,7 +20,6 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangePasswordScreen(
-    accessToken: String,
     onPasswordChanged: () -> Unit,
     onBack: () -> Unit,
     vm: ChangePasswordViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
@@ -140,7 +139,7 @@ fun ChangePasswordScreen(
             Button(
                 onClick = {
                     if (newPassword == confirmPassword && newPassword.isNotBlank()) {
-                        vm.changePassword(accessToken, oldPassword, newPassword)
+                        vm.changePassword(oldPassword, newPassword)
                     } else {
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar("Passwords do not match or are empty")

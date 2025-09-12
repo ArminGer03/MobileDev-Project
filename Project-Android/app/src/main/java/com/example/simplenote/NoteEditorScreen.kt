@@ -43,7 +43,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteEditorScreen(
-    accessToken: String,
     sessionKey: String,
     onBack: () -> Unit,
     onSavedAndExit: () -> Unit,
@@ -61,7 +60,9 @@ fun NoteEditorScreen(
     var lastEdited by remember { mutableStateOf(LocalTime.now()) }
     var showDeleteSheet by remember { mutableStateOf(false) }
 
-    fun touchEdited() { lastEdited = LocalTime.now() }
+    fun touchEdited() {
+        lastEdited = LocalTime.now()
+    }
 
     // If this is a NEW note session, ensure fields are blank (hard reset on new key)
     LaunchedEffect(sessionKey) {
@@ -76,7 +77,7 @@ fun NoteEditorScreen(
     LaunchedEffect(existingNoteId) {
         existingNoteId?.let { id ->
             try {
-                val dto = NotesRepository().getNote(accessToken, id)
+                val dto = NotesRepository().getNote(id)
                 noteId = dto.id
                 title = dto.title
                 body = dto.description
@@ -91,7 +92,7 @@ fun NoteEditorScreen(
         if (title.isBlank() && body.isBlank()) return@LaunchedEffect
         touchEdited()
         delay(900)
-        vm.saveOrUpdate(accessToken, noteId, title.trim(), body.trim())
+        vm.saveOrUpdate(noteId, title.trim(), body.trim())
     }
 
     // Save result (unchanged)
@@ -175,7 +176,12 @@ fun NoteEditorScreen(
                 )
             }
             ui.fieldErrors["title"]?.forEach {
-                Text("• $it", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, bottom = 4.dp))
+                Text(
+                    "• $it",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
+                )
             }
 
             // -------- Body (multiline) with placeholder --------
@@ -198,12 +204,21 @@ fun NoteEditorScreen(
                         body = it
                         vm.clearFieldErrors("description")
                     },
-                    textStyle = TextStyle(fontSize = 16.sp, color = Color(0xFF3D3A45), lineHeight = 22.sp),
+                    textStyle = TextStyle(
+                        fontSize = 16.sp,
+                        color = Color(0xFF3D3A45),
+                        lineHeight = 22.sp
+                    ),
                     modifier = Modifier.fillMaxSize()
                 )
             }
             ui.fieldErrors["description"]?.forEach {
-                Text("• $it", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(start = 16.dp, bottom = 4.dp))
+                Text(
+                    "• $it",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 16.dp, bottom = 4.dp)
+                )
             }
 
             Spacer(Modifier.height(4.dp))
@@ -244,7 +259,7 @@ fun NoteEditorScreen(
             onDismiss = { showDeleteSheet = false },
             onDelete = {
                 val id = noteId
-                if (id != null) vm.delete(accessToken, id) { onSavedAndExit() }
+                if (id != null) vm.delete(id) { onSavedAndExit() }
             }
         )
     }
@@ -291,7 +306,11 @@ private fun DeleteNoteSheet(
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Close", tint = Color(0xFF8D8A96))
+                    Icon(
+                        Icons.Outlined.Close,
+                        contentDescription = "Close",
+                        tint = Color(0xFF8D8A96)
+                    )
                 }
             }
 

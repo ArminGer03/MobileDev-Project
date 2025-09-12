@@ -5,7 +5,6 @@ import com.example.simplenote.network.ChangePasswordRequest
 
 class ChangePasswordRepository {
     suspend fun changePassword(
-        accessToken: String,
         oldPassword: String,
         newPassword: String
     ) {
@@ -13,8 +12,7 @@ class ChangePasswordRepository {
             ChangePasswordRequest(
                 oldPassword,
                 newPassword,
-            ),
-            "Bearer $accessToken",
+            )
         )
     }
 }

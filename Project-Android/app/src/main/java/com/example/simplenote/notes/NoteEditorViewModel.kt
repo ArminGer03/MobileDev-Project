@@ -28,16 +28,16 @@ class NoteEditorViewModel(
     var uiState = androidx.compose.runtime.mutableStateOf(NoteEditorUiState())
         private set
 
-    fun saveOrUpdate(token: String, existingId: Long?, title: String, description: String) {
+    fun saveOrUpdate(existingId: Long?, title: String, description: String) {
         if (title.isBlank() && description.isBlank()) return
         uiState.value = uiState.value.copy(loading = true, error = null)
 
         viewModelScope.launch {
             try {
                 val dto = if (existingId == null) {
-                    repo.createNote(token, title, description)
+                    repo.createNote(title, description)
                 } else {
-                    repo.updateNote(token, existingId, title, description)
+                    repo.updateNote(existingId, title, description)
                 }
                 uiState.value = uiState.value.copy(
                     loading = false,
@@ -53,18 +53,21 @@ class NoteEditorViewModel(
                     }
                     uiState.value = uiState.value.copy(loading = false, fieldErrors = map)
                 } else {
-                    uiState.value = uiState.value.copy(loading = false, error = "Save failed (${e.code()})")
+                    uiState.value =
+                        uiState.value.copy(loading = false, error = "Save failed (${e.code()})")
                 }
             } catch (e: Exception) {
-                uiState.value = uiState.value.copy(loading = false, error = e.message ?: "Save failed")
+                uiState.value =
+                    uiState.value.copy(loading = false, error = e.message ?: "Save failed")
             }
         }
     }
 
-    fun delete(token: String, id: Long, onDone: () -> Unit) {
+    fun delete(id: Long, onDone: () -> Unit) {
         viewModelScope.launch {
-            try { repo.deleteNote(token, id); onDone() }
-            catch (e: Exception) {
+            try {
+                repo.deleteNote(id); onDone()
+            } catch (e: Exception) {
                 uiState.value = uiState.value.copy(error = e.message ?: "Delete failed")
             }
         }
@@ -75,6 +78,11 @@ class NoteEditorViewModel(
         if (cur.remove(attr) != null) uiState.value = uiState.value.copy(fieldErrors = cur)
     }
 
-    fun consumeSaved() { uiState.value = uiState.value.copy(savedNoteId = null) }
-    fun clearError() { uiState.value = uiState.value.copy(error = null) }
+    fun consumeSaved() {
+        uiState.value = uiState.value.copy(savedNoteId = null)
+    }
+
+    fun clearError() {
+        uiState.value = uiState.value.copy(error = null)
+    }
 }

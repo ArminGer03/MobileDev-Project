@@ -1,5 +1,7 @@
 package com.example.simplenote.network
 
+import android.content.Context
+import com.example.simplenote.auth.TokenManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
@@ -62,14 +64,10 @@ data class PagedNotesResponse(
     val previous: String?,
     val results: List<NoteDto>
 )
-
 interface ApiService {
-    // Auth
+    // -------- Auth --------
     @POST("api/auth/change-password/")
-    suspend fun changePassword(
-        @Body body: ChangePasswordRequest,
-        @Header("Authorization") auth: String
-    ): ChangePasswordResponse
+    suspend fun changePassword(@Body body: ChangePasswordRequest): ChangePasswordResponse
 
     @POST("api/auth/token/")
     suspend fun login(@Body body: LoginRequest): TokenResponse
@@ -81,44 +79,32 @@ interface ApiService {
     suspend fun refresh(@Body body: RefreshRequest): RefreshResponse
 
     @GET("api/auth/userinfo/")
-    suspend fun getUserInfo(@Header("Authorization") auth: String): UserInfoResponse
+    suspend fun getUserInfo(): UserInfoResponse
 
-    // Notes
+    // -------- Notes --------
     @GET("api/notes/{id}/")
-    suspend fun getNote(
-        @Path("id") id: Long,
-        @Header("Authorization") auth: String
-    ): NoteDto
+    suspend fun getNote(@Path("id") id: Long): NoteDto
 
     @POST("api/notes/")
-    suspend fun createNote(
-        @Body body: CreateNoteRequest,
-        @Header("Authorization") auth: String
-    ): NoteDto
+    suspend fun createNote(@Body body: CreateNoteRequest): NoteDto
 
     @PATCH("api/notes/{id}/")
     suspend fun updateNote(
         @Path("id") id: Long,
-        @Body body: UpdateNoteRequest,
-        @Header("Authorization") auth: String
+        @Body body: UpdateNoteRequest
     ): NoteDto
 
     @DELETE("api/notes/{id}/")
-    suspend fun deleteNote(
-        @Path("id") id: Long,
-        @Header("Authorization") auth: String
-    )
+    suspend fun deleteNote(@Path("id") id: Long)
 
     @GET("api/notes/")
     suspend fun listNotesPaged(
-        @Header("Authorization") auth: String,
         @Query("page") page: Int? = null,
         @Query("page_size") pageSize: Int? = null
     ): PagedNotesResponse
 
     @GET("api/notes/filter")
     suspend fun filterNotesPaged(
-        @Header("Authorization") auth: String,
         @Query("title") title: String? = null,
         @Query("description") description: String? = null,
         @Query("updated__gte") updatedGte: String? = null,
@@ -128,14 +114,37 @@ interface ApiService {
     ): PagedNotesResponse
 }
 
+// --- ApiClient ---
 object ApiClient {
+    fun create(context: Context): ApiService {
+        val tokenManager = TokenManager(context)
+        val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+
+        val logger = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logger)
+            // Add interceptor AFTER logger so we see modified requests too
+            .addInterceptor { chain ->
+                AuthInterceptor(tokenManager, api).intercept(chain)
+            }
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(ApiService::class.java)
+    }
+
+    // Lazy fallback (not used with refresh)
     val api: ApiService by lazy {
-        val logger = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
-        val client = OkHttpClient.Builder().addInterceptor(logger).build()
         val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(client)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(ApiService::class.java)

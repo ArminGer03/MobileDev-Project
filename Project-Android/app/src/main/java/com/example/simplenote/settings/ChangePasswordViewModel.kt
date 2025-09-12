@@ -17,11 +17,11 @@ class ChangePasswordViewModel(
     var uiState = androidx.compose.runtime.mutableStateOf(ChangePasswordUiState())
         private set
 
-    fun changePassword(accessToken: String, oldPassword: String, newPassword: String) {
+    fun changePassword(oldPassword: String, newPassword: String) {
         uiState.value = ChangePasswordUiState(loading = true)
         viewModelScope.launch {
             try {
-                repo.changePassword(accessToken, oldPassword, newPassword)
+                repo.changePassword(oldPassword, newPassword)
                 uiState.value = ChangePasswordUiState(success = true)
             } catch (e: Exception) {
                 uiState.value = ChangePasswordUiState(

@@ -7,6 +7,9 @@ import androidx.compose.runtime.*
 import com.example.simplenote.ui.theme.SimpleNoteTheme
 import java.util.UUID
 import androidx.compose.material3.Text
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import com.example.simplenote.auth.TokenManager
 
 class MainActivity : ComponentActivity() {
 
@@ -26,13 +29,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val tokenManager = TokenManager(applicationContext)
+
         setContent {
             var editorSessionKey by remember { mutableStateOf<String?>(null) }
 
             SimpleNoteTheme {
                 var screen by remember { mutableStateOf<Screen>(Screen.Onboarding) }
-                var accessToken by remember { mutableStateOf<String?>(null) }
+                val accessToken by tokenManager.accessToken.collectAsState(initial = null)
                 var lastRegisteredUsername by remember { mutableStateOf<String?>(null) }
+
+                LaunchedEffect(accessToken) {
+                    screen = if (accessToken.isNullOrEmpty()) {
+                        Screen.Login
+                    } else {
+                        Screen.Home
+                    }
+                }
+
 
                 when (val s = screen) {
                     is Screen.Onboarding -> OnboardingScreen(
@@ -40,8 +54,10 @@ class MainActivity : ComponentActivity() {
                     )
 
                     is Screen.Login -> LoginScreen(
-                        onLoginSuccess = { access, _ ->
-                            accessToken = access
+                        onLoginSuccess = { access, refresh ->
+                            lifecycleScope.launch {
+                                tokenManager.saveTokens(access, refresh)
+                            }
                             screen = Screen.Home
                         },
                         onRegisterClick = { screen = Screen.Register }
@@ -56,7 +72,6 @@ class MainActivity : ComponentActivity() {
                     )
 
                     is Screen.Home -> HomeScreen(
-                        accessToken = accessToken.orEmpty(),
                         onAddNote = {
                             editorSessionKey = UUID.randomUUID().toString()
                             screen = Screen.NewNote
@@ -71,7 +86,6 @@ class MainActivity : ComponentActivity() {
 
 
                     is Screen.NewNote -> NoteEditorScreen(
-                        accessToken = accessToken.orEmpty(),
                         sessionKey = editorSessionKey ?: UUID.randomUUID().toString(), // pass key
                         existingNoteId = null,
                         onBack = { screen = Screen.Home },
@@ -79,7 +93,6 @@ class MainActivity : ComponentActivity() {
                     )
 
                     is Screen.EditNote -> NoteEditorScreen(
-                        accessToken = accessToken.orEmpty(),
                         sessionKey = editorSessionKey ?: "edit-${(screen as Screen.EditNote).id}",
                         existingNoteId = (screen as Screen.EditNote).id,
                         onBack = { screen = Screen.Home },
@@ -92,21 +105,21 @@ class MainActivity : ComponentActivity() {
                     }
 
                     is Screen.Settings -> SettingsScreen(
-                        accessToken = accessToken.orEmpty(),
                         onChangePassword = { screen = Screen.ChangePassword },
                         onLogoutSuccess = {
-                            accessToken = null
+                            lifecycleScope.launch {
+                                tokenManager.clearTokens()
+                            }
                             screen = Screen.Login
+
                         },
                         onBack = { screen = Screen.Home }
                     )
 
                     is Screen.ChangePassword -> ChangePasswordScreen(
-                        accessToken = accessToken.orEmpty(),
                         onPasswordChanged = { screen = Screen.Settings },
                         onBack = { screen = Screen.Settings }
                     )
-
 
                 }
             }

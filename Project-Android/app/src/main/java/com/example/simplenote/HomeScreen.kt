@@ -43,7 +43,6 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
-    accessToken: String,
     onAddNote: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNote: (Long) -> Unit,
@@ -57,14 +56,14 @@ fun HomeScreen(
     val barHeight = 80.dp    // your bottom bar height
 
     // Load first page on entry
-    LaunchedEffect(accessToken) { vm.init(accessToken) }
+    LaunchedEffect(Unit) { vm.init() }
     val ui = vm.uiState.value
 
     // Refresh when returning to Home (after create/delete)
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, accessToken) {
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) vm.refresh(accessToken)
+            if (event == Lifecycle.Event.ON_RESUME) vm.refresh()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -100,7 +99,7 @@ fun HomeScreen(
                     NavigationBarItem(
                         selected = selectedTab == 0,
                         onClick = {
-                            if (selectedTab == 0) vm.refresh(accessToken)
+                            if (selectedTab == 0) vm.refresh()
                             selectedTab = 0
                         },
                         icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
@@ -126,7 +125,11 @@ fun HomeScreen(
                         .align(Alignment.TopCenter)
                         .offset(y = -fabSize / 2)   // center of FAB sits on the bar's top edge
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add", modifier = Modifier.size(28.dp))
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = "Add",
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
             }
         }
@@ -197,10 +200,10 @@ fun HomeScreen(
                     }
 
                     // Ensure pages are loaded as you swipe (and prefetch neighbors)
-                    LaunchedEffect(visiblePage, accessToken, totalPages) {
-                        vm.ensurePage(accessToken, visiblePage)
-                        vm.ensurePage(accessToken, (visiblePage + 1).coerceAtMost(totalPages))
-                        vm.ensurePage(accessToken, (visiblePage - 1).coerceAtLeast(1))
+                    LaunchedEffect(visiblePage, totalPages) {
+                        vm.ensurePage(visiblePage)
+                        vm.ensurePage((visiblePage + 1).coerceAtMost(totalPages))
+                        vm.ensurePage((visiblePage - 1).coerceAtLeast(1))
                     }
 
                     // ---- Overlayed pager + indicator ----
@@ -225,14 +228,19 @@ fun HomeScreen(
                                 ) {
                                     val pageNotes = ui.pages[page].orEmpty()
                                     if (pageNotes.isEmpty() && page != 1) {
-                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Box(
+                                            Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
                                             CircularProgressIndicator()
                                         }
                                     } else {
                                         // Filter only current page
                                         val filtered = pageNotes.filter {
                                             val q = query.trim().lowercase()
-                                            q.isBlank() || it.title.lowercase().contains(q) || it.description.lowercase().contains(q)
+                                            q.isBlank() || it.title.lowercase()
+                                                .contains(q) || it.description.lowercase()
+                                                .contains(q)
                                         }
                                         NotesGridPage(
                                             notes = filtered,
@@ -248,7 +256,13 @@ fun HomeScreen(
                         PageIndicator(
                             total = totalPages,
                             current = visiblePage,
-                            onDotClick = { target -> scope.launch { listState.animateScrollToItem(target - 1) } },
+                            onDotClick = { target ->
+                                scope.launch {
+                                    listState.animateScrollToItem(
+                                        target - 1
+                                    )
+                                }
+                            },
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .padding(bottom = fabSize / 4 + 5.dp)

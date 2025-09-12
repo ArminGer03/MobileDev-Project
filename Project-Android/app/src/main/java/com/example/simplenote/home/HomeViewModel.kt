@@ -26,11 +26,11 @@ class HomeViewModel(
         private set
 
     /** Reset and load page 1 */
-    fun init(token: String) {
+    fun init() {
         uiState.value = HomeUiState(loading = true)
         viewModelScope.launch {
             try {
-                val resp = repo.listNotesPaged(token, page = 1, pageSize = 6)
+                val resp = repo.listNotesPaged(page = 1, pageSize = 6)
                 uiState.value = HomeUiState(
                     loading = false,
                     count = resp.count,
@@ -44,7 +44,7 @@ class HomeViewModel(
     }
 
     /** Ensure a page exists in state; if not, fetch it */
-    fun ensurePage(token: String, page: Int) {
+    fun ensurePage(page: Int) {
         val ui = uiState.value
         if (page < 1 || page > ui.totalPages) return
         if (ui.pages.containsKey(page)) return
@@ -52,7 +52,7 @@ class HomeViewModel(
         // Mark loading (optional: you can set a small flag; we keep it simple)
         viewModelScope.launch {
             try {
-                val resp = repo.listNotesPaged(token, page = page, pageSize = ui.pageSize)
+                val resp = repo.listNotesPaged(page = page, pageSize = ui.pageSize)
                 uiState.value = uiState.value.copy(
                     pages = uiState.value.pages + (page to resp.results)
                 )
@@ -62,5 +62,5 @@ class HomeViewModel(
         }
     }
 
-    fun refresh(token: String) = init(token)
+    fun refresh() = init()
 }
