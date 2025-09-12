@@ -220,7 +220,7 @@ fun HomeScreen(
                             items((1..totalPages).toList(), key = { it }) { page ->
                                 Box(
                                     modifier = Modifier
-                                        .fillParentMaxWidth()   // ✅ exactly the LazyRow viewport width (respects outer padding)
+                                        .fillParentMaxWidth()
                                         .fillMaxHeight()
                                 ) {
                                     val pageNotes = ui.pages[page].orEmpty()

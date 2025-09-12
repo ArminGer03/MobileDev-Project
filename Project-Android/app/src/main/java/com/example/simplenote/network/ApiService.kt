@@ -89,6 +89,17 @@ interface ApiService {
         @Query("page") page: Int? = null,
         @Query("page_size") pageSize: Int? = null
     ): PagedNotesResponse
+
+    @GET("api/notes/filter")
+    suspend fun filterNotesPaged(
+        @Header("Authorization") auth: String,
+        @Query("title") title: String? = null,
+        @Query("description") description: String? = null,
+        @Query("updated__gte") updatedGte: String? = null,
+        @Query("updated__lte") updatedLte: String? = null,
+        @Query("page") page: Int? = null,
+        @Query("page_size") pageSize: Int? = null
+    ): PagedNotesResponse
 }
 
 object ApiClient {
