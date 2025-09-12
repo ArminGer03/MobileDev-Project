@@ -16,6 +16,8 @@ class MainActivity : ComponentActivity() {
         data object Register : Screen()
         data object Home : Screen()
         data class Detail(val noteId: String) : Screen()
+        data object NewNote : Screen()
+
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,9 +51,15 @@ class MainActivity : ComponentActivity() {
                     )
 
                     is Screen.Home -> HomeScreen(
-                        onAddNote = { /* open create note screen */ },
-                        onOpenSettings = { /* open settings */ },
+                        onAddNote = { screen = Screen.NewNote },
+                        onOpenSettings = { /* ... */ },
                         username = lastRegisteredUsername
+                    )
+
+                    is Screen.NewNote -> NoteEditorScreen(
+                        accessToken = accessToken.orEmpty(),
+                        onBack = { screen = Screen.Home },
+                        onSavedAndExit = { screen = Screen.Home }
                     )
 
                     is Screen.Detail -> {
