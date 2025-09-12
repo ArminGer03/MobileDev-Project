@@ -1,11 +1,17 @@
 package com.example.simplenote
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,49 +26,46 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.simplenote.home.HomeViewModel
 import com.example.simplenote.network.NoteDto
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
-
+import kotlin.math.max
 
 @Composable
 fun HomeScreen(
     accessToken: String,
     onAddNote: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenNote: (Long) -> Unit = {},
+    onOpenNote: (Long) -> Unit,
     username: String? = null,
     vm: HomeViewModel = viewModel()
 ) {
     val bg = Color(0xFFFAF8FC)
     val purple = Color(0xFF504EC3)
     var selectedTab by remember { mutableStateOf(0) } // 0=Home, 1=Settings
-    var query by remember { mutableStateOf("") }
 
+    // Load first page on entry
+    LaunchedEffect(accessToken) { vm.init(accessToken) }
+    val ui = vm.uiState.value
+
+    // Refresh when returning to Home (after create/delete)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, accessToken) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                vm.loadNotes(accessToken, allPages = true)
-            }
+            if (event == Lifecycle.Event.ON_RESUME) vm.refresh(accessToken)
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-
-
-    // Load once per token
-    LaunchedEffect(accessToken) { vm.loadNotes(accessToken, allPages = true) }
-    val ui = vm.uiState.value
 
     Scaffold(
         containerColor = bg,
@@ -81,15 +84,13 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = {
-                        if (selectedTab == 0) vm.loadNotes(accessToken, allPages = true) // manual refresh
+                        if (selectedTab == 0) vm.refresh(accessToken) // tap-to-refresh
                         selectedTab = 0
                     },
                     icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
                     label = { Text("Home") }
                 )
-
                 Spacer(Modifier.weight(1f))
-
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1; onOpenSettings() },
@@ -117,8 +118,8 @@ fun HomeScreen(
                     modifier = Modifier.padding(16.dp)
                 )
 
-                ui.notes.isEmpty() -> {
-                    // EMPTY STATE — NO SEARCH BOX HERE
+                !ui.hasNotes -> {
+                    // EMPTY STATE — NO SEARCH BOX
                     EmptyState(
                         modifier = Modifier
                             .fillMaxSize()
@@ -128,7 +129,7 @@ fun HomeScreen(
                 }
 
                 else -> {
-                    // NOTES VERSION — SHOW SEARCH + GRID
+                    // NOTES MODE — Search + Pager + Dots
                     var query by remember { mutableStateOf("") }
 
                     OutlinedTextField(
@@ -140,7 +141,7 @@ fun HomeScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 56.dp) // avoids cropping
+                            .heightIn(min = 56.dp)
                     )
 
                     Spacer(Modifier.height(10.dp))
@@ -153,27 +154,78 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(12.dp))
 
-                    val filtered = ui.notes.filter { n ->
-                        val q = query.trim().lowercase()
-                        q.isBlank() || n.title.lowercase().contains(q) || n.description.lowercase().contains(q)
+                    val totalPages = ui.totalPages
+                    val listState: LazyListState = rememberLazyListState()
+                    val fling = rememberSnapFlingBehavior(listState)
+
+                    // Ensure the currently visible page is loaded
+                    val visiblePage by remember {
+                        derivedStateOf { listState.firstVisibleItemIndex + 1 /* 1-based */ }
+                    }
+                    LaunchedEffect(visiblePage, accessToken, totalPages) {
+                        vm.ensurePage(accessToken, visiblePage)
+                        // Prefetch neighbors for smoother swipe
+                        vm.ensurePage(accessToken, (visiblePage + 1).coerceAtMost(totalPages))
+                        vm.ensurePage(accessToken, (visiblePage - 1).coerceAtLeast(1))
                     }
 
-                    Box(Modifier.weight(1f)) {
-                        NotesGrid(
-                            notes = filtered,
-                            onClick = onOpenNote,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                    // Horizontal "pages", each holds up to 6 notes in a 2-column grid
+                    LazyRow(
+                        state = listState,
+                        flingBehavior = fling,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentPadding = PaddingValues(horizontal = 0.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        items((1..totalPages).toList(), key = { it }) { page ->
+                            // Each page takes full width
+                            Box(
+                                modifier = Modifier
+                                    .fillParentMaxWidth()
+                                    .fillMaxHeight()
+                            ) {
+                                val pageNotes = (ui.pages[page] ?: emptyList())
+                                if (pageNotes.isEmpty() && (page != 1)) {
+                                    // Not loaded yet — small loader placeholder
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                } else {
+                                    // Filter current page locally
+                                    val filtered = pageNotes.filter {
+                                        val q = query.trim().lowercase()
+                                        q.isBlank() ||
+                                                it.title.lowercase().contains(q) ||
+                                                it.description.lowercase().contains(q)
+                                    }
+                                    NotesGridPage(
+                                        notes = filtered,
+                                        onClick = onOpenNote,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+                        }
                     }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Page dots
+                    PageDots(
+                        total = totalPages,
+                        current = visiblePage
+                    )
                 }
             }
         }
-
     }
 }
 
+/** The grid inside a single page (max 6 items) */
 @Composable
-private fun NotesGrid(
+private fun NotesGridPage(
     notes: List<NoteDto>,
     onClick: (Long) -> Unit,
     modifier: Modifier = Modifier
@@ -183,12 +235,10 @@ private fun NotesGrid(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 96.dp)
+        contentPadding = PaddingValues(bottom = 96.dp, top = 0.dp)
     ) {
-        itemsIndexed(notes, key = { _, n -> n.id }) { index, note ->
-            val cardColor =
-                if (index % 2 == 0) Color(0xFFFFF6C5) else Color(0xFFFFEDB3) // soft yellows
-            NoteCard(note = note, bg = cardColor, onClick = { onClick(note.id) })
+        items(notes, key = { it.id }) { note ->
+            NoteCard(note = note, bg = Color(0xFFFFF6C5)) { onClick(note.id) }
         }
     }
 }
@@ -226,7 +276,33 @@ private fun NoteCard(note: NoteDto, bg: Color, onClick: () -> Unit) {
     }
 }
 
-// ---------- Empty state (unchanged) ----------
+/** Minimal dots indicator showing the current page */
+@Composable
+private fun PageDots(total: Int, current: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(total) { idx ->
+            val active = (idx + 1) == current
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(if (active) 8.dp else 6.dp)
+                    .clip(CircleShape)
+                    .then(
+                        if (active) Modifier.background(Color(0xFF504EC3))
+                        else Modifier.background(Color(0x33504EC3))
+                    )
+            )
+        }
+    }
+}
+
+// ---------- Empty state (same as before) ----------
 @Composable
 private fun EmptyState(modifier: Modifier = Modifier, username: String?) {
     val textDark = Color(0xFF1C1B1F)

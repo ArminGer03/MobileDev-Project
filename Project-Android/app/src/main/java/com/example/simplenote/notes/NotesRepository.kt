@@ -42,4 +42,8 @@ class NotesRepository {
 
     suspend fun getNote(token: String, id: Long): NoteDto =
         ApiClient.api.getNote(id, "Bearer $token")
+
+    suspend fun listNotesPaged(token: String, page: Int, pageSize: Int = 6): PagedNotesResponse =
+        ApiClient.api.listNotesPaged("Bearer $token", page = page, pageSize = pageSize)
+
 }
