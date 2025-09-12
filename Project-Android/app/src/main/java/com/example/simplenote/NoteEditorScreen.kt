@@ -27,6 +27,19 @@ import kotlinx.coroutines.delay
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteEditorScreen(
@@ -46,7 +59,7 @@ fun NoteEditorScreen(
     var title by rememberSaveable(sessionKey) { mutableStateOf("") }
     var body by rememberSaveable(sessionKey) { mutableStateOf("") }
     var lastEdited by remember { mutableStateOf(LocalTime.now()) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDeleteSheet by remember { mutableStateOf(false) }
 
     fun touchEdited() { lastEdited = LocalTime.now() }
 
@@ -216,7 +229,7 @@ fun NoteEditorScreen(
                         .width(76.dp)
                         .fillMaxHeight()
                         .background(purple)
-                        .clickable(enabled = noteId != null) { showDeleteConfirm = true },
+                        .clickable(enabled = noteId != null) { showDeleteSheet = true },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = Color.White)
@@ -226,22 +239,91 @@ fun NoteEditorScreen(
     }
 
     // Confirm delete dialog
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete note?") },
-            text = { Text("This cannot be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteConfirm = false
-                        val id = noteId
-                        if (id != null) vm.delete(accessToken, id) { onSavedAndExit() }
-                    },
-                    enabled = noteId != null
-                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } }
+    if (showDeleteSheet) {
+        DeleteNoteSheet(
+            onDismiss = { showDeleteSheet = false },
+            onDelete = {
+                val id = noteId
+                if (id != null) vm.delete(accessToken, id) { onSavedAndExit() }
+            }
         )
+    }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DeleteNoteSheet(
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        containerColor = Color.White,
+        dragHandle = null // Figma shows no handle
+    ) {
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            // Header row: title + close chip
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Want to Delete this Note?",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1C1B1F),
+                    modifier = Modifier.weight(1f)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F0F5))
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Close", tint = Color(0xFF8D8A96))
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Divider(color = Color(0x14000000))
+            Spacer(Modifier.height(6.dp))
+
+            // Destructive action row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        onDelete()
+                        onDismiss()
+                    }
+                    .padding(vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Outlined.DeleteForever,
+                    contentDescription = null,
+                    tint = Color(0xFFCF3A3A)
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "Delete Note",
+                    color = Color(0xFFCF3A3A),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
