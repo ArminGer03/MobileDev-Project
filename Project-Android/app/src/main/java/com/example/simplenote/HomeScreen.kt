@@ -64,11 +64,18 @@ fun HomeScreen(
             NavigationBar(containerColor = Color.White) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    onClick = {
+                        if (selectedTab == 0) {
+                            vm.loadNotes(accessToken, allPages = true)
+                        }
+                        selectedTab = 0
+                    },
                     icon = { Icon(Icons.Outlined.Home, contentDescription = "Home") },
                     label = { Text("Home") }
                 )
+
                 Spacer(Modifier.weight(1f))
+
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1; onOpenSettings() },
@@ -85,31 +92,19 @@ fun HomeScreen(
                 .systemBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
-            // Search (always visible)
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                placeholder = { Text("Search…", maxLines = 1) },
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp) // Material3 default min height, no cropping
-            )
-
-            Spacer(Modifier.height(10.dp))
-
             when {
                 ui.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
+
                 ui.error != null -> Text(
                     text = ui.error ?: "",
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(16.dp)
                 )
+
                 ui.notes.isEmpty() -> {
+                    // EMPTY STATE — NO SEARCH BOX HERE
                     EmptyState(
                         modifier = Modifier
                             .fillMaxSize()
@@ -117,7 +112,25 @@ fun HomeScreen(
                         username = username
                     )
                 }
+
                 else -> {
+                    // NOTES VERSION — SHOW SEARCH + GRID
+                    var query by remember { mutableStateOf("") }
+
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        placeholder = { Text("Search…", maxLines = 1) },
+                        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 56.dp) // avoids cropping
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
                     Text(
                         text = "Notes",
                         fontWeight = FontWeight.SemiBold,
@@ -126,12 +139,11 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(12.dp))
 
-                    val filtered: List<NoteDto> = ui.notes.filter { n ->
+                    val filtered = ui.notes.filter { n ->
                         val q = query.trim().lowercase()
                         q.isBlank() || n.title.lowercase().contains(q) || n.description.lowercase().contains(q)
                     }
 
-                    // Give the grid weight so it can scroll beyond 2 cards
                     Box(Modifier.weight(1f)) {
                         NotesGrid(
                             notes = filtered,
@@ -142,6 +154,7 @@ fun HomeScreen(
                 }
             }
         }
+
     }
 }
 
