@@ -40,6 +40,11 @@ import com.example.simplenote.network.NoteDto
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import com.example.simplenote.util.AndroidNetworkMonitor
+import com.example.simplenote.util.ConnectivityObserver
+import kotlinx.coroutines.flow.collectLatest
+
 
 @Composable
 fun HomeScreen(
@@ -59,6 +64,18 @@ fun HomeScreen(
     // Load first page on entry
     LaunchedEffect(accessToken) { vm.init(accessToken) }
     val ui = vm.uiState.value
+
+    val context = LocalContext.current
+    val netObserver = remember { AndroidNetworkMonitor(context) }
+    val netStatus by netObserver.observe().collectAsState(initial = ConnectivityObserver.Status.Unavailable)
+
+    // Optional: when regaining connectivity, lightly refresh
+    LaunchedEffect(netStatus) {
+        if (netStatus == ConnectivityObserver.Status.Available) {
+            vm.refresh(accessToken)
+        }
+    }
+
 
     // Refresh when returning to Home (after create/delete)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -138,6 +155,14 @@ fun HomeScreen(
                 .systemBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
+            NetworkStatusPill(
+                isTimeout = ui.timeoutActive,   // <-- use the sticky flag
+                status = netStatus,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
+
             when {
                 ui.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -408,6 +433,45 @@ private fun EmptyState(modifier: Modifier = Modifier, username: String?) {
                     .clip(RoundedCornerShape(16.dp)),
                 contentScale = ContentScale.Fit
             )
+        }
+    }
+}
+
+@Composable
+private fun NetworkStatusPill(
+    isTimeout: Boolean,
+    status: com.example.simplenote.util.ConnectivityObserver.Status,
+    modifier: Modifier = Modifier
+) {
+    val (bg, dot, text) =
+        if (isTimeout) {
+            Triple(Color(0xFFFFEBEE), Color(0xFFD32F2F), "Timeout")
+        } else when (status) {
+            com.example.simplenote.util.ConnectivityObserver.Status.Available -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "Online")
+            com.example.simplenote.util.ConnectivityObserver.Status.Losing,
+            com.example.simplenote.util.ConnectivityObserver.Status.Lost,
+            com.example.simplenote.util.ConnectivityObserver.Status.Unavailable -> Triple(Color(0xFFFFF8E1), Color(0xFFF57C00), "Connecting…")
+        }
+
+    Surface(
+        color = bg,
+        shape = RoundedCornerShape(12.dp),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(dot)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(text, color = Color(0xFF1C1B1F), fontSize = 13.sp, fontWeight = FontWeight.Medium)
         }
     }
 }

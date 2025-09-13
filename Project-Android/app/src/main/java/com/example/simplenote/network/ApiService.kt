@@ -7,6 +7,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.*
+import java.util.concurrent.TimeUnit
 
 
 // for deployed use case
@@ -137,7 +138,12 @@ interface ApiService {
 object ApiClient {
     val api: ApiService by lazy {
         val logger = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
-        val client = OkHttpClient.Builder().addInterceptor(logger).build()
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logger)
+            .connectTimeout(3, TimeUnit.SECONDS)   // NEW
+            .readTimeout(3, TimeUnit.SECONDS)      // NEW
+            .writeTimeout(3, TimeUnit.SECONDS)     // NEW
+            .build()
         val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
         Retrofit.Builder()
             .baseUrl(BASE_URL)
@@ -147,3 +153,4 @@ object ApiClient {
             .create(ApiService::class.java)
     }
 }
+

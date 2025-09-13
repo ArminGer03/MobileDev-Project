@@ -6,13 +6,15 @@ import com.example.simplenote.network.NoteDto
 import com.example.simplenote.notes.NotesRepository
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import java.net.SocketTimeoutException
 
 data class HomeUiState(
     val loading: Boolean = false,
     val error: String? = null,
     val count: Int = 0,
     val pageSize: Int = 6,
-    val pages: Map<Int, List<NoteDto>> = emptyMap() // 1-based page -> notes
+    val pages: Map<Int, List<NoteDto>> = emptyMap(), // 1-based page -> notes
+    val timeoutActive: Boolean = false                // <-- STICKY timeout flag
 ) {
     val totalPages: Int get() = max(1, (count + pageSize - 1) / pageSize)
     val hasNotes: Boolean get() = count > 0 || pages.values.any { it.isNotEmpty() }
@@ -35,10 +37,21 @@ class HomeViewModel(
                     loading = false,
                     count = resp.count,
                     pageSize = 6,
-                    pages = mapOf(1 to resp.results)
+                    pages = mapOf(1 to resp.results),
+                    timeoutActive = false                 // clear timeout on success
+                )
+            } catch (e: SocketTimeoutException) {
+                uiState.value = HomeUiState(
+                    loading = false,
+                    error = "Request timed out",
+                    timeoutActive = true                  // stick to TIMEOUT until success
                 )
             } catch (e: Exception) {
-                uiState.value = HomeUiState(loading = false, error = e.message ?: "Failed to load notes")
+                uiState.value = HomeUiState(
+                    loading = false,
+                    error = e.message ?: "Failed to load notes",
+                    timeoutActive = uiState.value.timeoutActive
+                )
             }
         }
     }
@@ -49,15 +62,22 @@ class HomeViewModel(
         if (page < 1 || page > ui.totalPages) return
         if (ui.pages.containsKey(page)) return
 
-        // Mark loading (optional: you can set a small flag; we keep it simple)
         viewModelScope.launch {
             try {
                 val resp = repo.listNotesPaged(token, page = page, pageSize = ui.pageSize)
                 uiState.value = uiState.value.copy(
-                    pages = uiState.value.pages + (page to resp.results)
+                    pages = uiState.value.pages + (page to resp.results),
+                    timeoutActive = false                 // clear timeout on success
+                )
+            } catch (e: SocketTimeoutException) {
+                uiState.value = uiState.value.copy(
+                    error = "Request timed out",
+                    timeoutActive = true                  // keep showing TIMEOUT
                 )
             } catch (e: Exception) {
-                uiState.value = uiState.value.copy(error = e.message ?: "Failed to load page $page")
+                uiState.value = uiState.value.copy(
+                    error = e.message ?: "Failed to load page $page"
+                )
             }
         }
     }
