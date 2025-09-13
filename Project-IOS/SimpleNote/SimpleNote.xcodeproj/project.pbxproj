@@ -5,6 +5,7 @@
 	};
 	objectVersion = 77;
 	objects = {
+
 /* Begin PBXFileReference section */
 		C64444042E75C72D00C19F67 /* SimpleNote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimpleNote.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
