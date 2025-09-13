@@ -45,7 +45,10 @@ fun SettingsScreen(
 
     // Navigate back to login if logged out
     LaunchedEffect(ui.loggedOut) {
-        if (ui.loggedOut) onLogoutSuccess()
+        if (ui.loggedOut) {
+            onLogoutSuccess()
+            vm.clearLogout()
+        }
     }
 
     Scaffold(

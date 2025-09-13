@@ -39,4 +39,9 @@ class SettingsViewModel(
     fun clearError() {
         uiState.value = uiState.value.copy(error = null)
     }
+
+    fun clearLogout() {
+        // In a real app you might clear tokens from DataStore/SharedPrefs
+        uiState.value = uiState.value.copy(loggedOut = false)
+    }
 }
