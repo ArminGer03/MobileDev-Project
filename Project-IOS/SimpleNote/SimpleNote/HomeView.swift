@@ -4,18 +4,17 @@ struct HomeView: View {
     @StateObject private var vm  = HomeViewModel()
     @StateObject private var net = Connectivity()
 
+    // Navigation callbacks
     var onAdd: () -> Void
     var onOpen: (Note) -> Void
     var onOpenSettings: () -> Void
-    var onLogout: () -> Void
 
     @State private var query = ""
 
     var body: some View {
         ZStack {
             VStack(spacing: 10) {
-
-                // Compose an effective status for the pill
+                // Effective pill status: timeout (from VM) wins; otherwise OS connectivity
                 let effectiveStatus: NetStatus = {
                     if case .timeout = vm.status { return vm.status }
                     return net.isOnline ? .available : .connecting
@@ -23,13 +22,6 @@ struct HomeView: View {
 
                 NetworkPill(status: effectiveStatus)
                     .padding(.horizontal, 16)
-
-                if let err = vm.error, !err.isEmpty {
-                    Text(err)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 16)
-                }
 
                 if !vm.hasNotes {
                     EmptyHome()
@@ -56,7 +48,7 @@ struct HomeView: View {
                                     let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                                     guard !q.isEmpty else { return true }
                                     return n.title.lowercased().contains(q)
-                                        || n.description.lowercased().contains(q)   // <- no ??
+                                        || n.description.lowercased().contains(q)
                                 },
                                 onOpen: onOpen
                             )
@@ -68,55 +60,63 @@ struct HomeView: View {
                 }
 
                 Spacer(minLength: 0)
-                Color.clear.frame(height: 80)
+                Color.clear.frame(height: 80) // breathing room for bottom buttons
             }
 
-            // Centered FAB
+            // Bottom controls overlay
             VStack {
                 Spacer()
-                Button(action: onAdd) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .bold))
-                        .frame(width: 72, height: 72)
-                        .background(Color(red: 0.314, green: 0.306, blue: 0.765)) // #504EC3
-                        .foregroundStyle(.white)
-                        .clipShape(Circle())
-                        .shadow(radius: 6)
+                ZStack {
+                    // Center FAB (+)
+                    Button(action: onAdd) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 24, weight: .bold))
+                            .frame(width: 72, height: 72)
+                            .background(Color(red: 0.314, green: 0.306, blue: 0.765)) // #504EC3
+                            .foregroundStyle(.white)
+                            .clipShape(Circle())
+                            .shadow(radius: 6)
+                    }
+                    .offset(y: -40)
+
+                    // Bottom-right Settings button (gear)
+                    HStack {
+                        Spacer()
+                        Button(action: onOpenSettings) {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .frame(width: 52, height: 52)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                                .shadow(radius: 3)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 10)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                .offset(y: -40)
             }
         }
         // First load on appear
         .task {
             if vm.pages.isEmpty { await vm.initLoad() }
         }
-        // Retry when OS connectivity becomes online
+        // If connectivity flips online and we still have nothing, try again
         .task(id: net.isOnline) {
             if net.isOnline && vm.pages.isEmpty { await vm.initLoad() }
         }
         .navigationTitle("Home")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // ✅ Use legacy placements to avoid the Visibility overload
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Logout", action: onLogout)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: onOpenSettings) {
-                    Image(systemName: "gearshape")
-                }
-            }
-        }
+        .toolbar { } // no top buttons
     }
 }
 
 //
-// MARK: - Helpers (same file)
+// MARK: - Helpers kept inline
 //
 
 private struct NetworkPill: View {
     let status: NetStatus
-
     var body: some View {
         let (bg, dot, text): (Color, Color, String) = {
             switch status {
@@ -129,7 +129,6 @@ private struct NetworkPill: View {
                         sec > 0 ? "Timeout — retry in \(sec)s" : "Timeout — retrying…")
             }
         }()
-
         HStack(spacing: 8) {
             Circle().fill(dot).frame(width: 8, height: 8)
             Text(text).font(.footnote).fontWeight(.medium).foregroundStyle(.primary)
@@ -139,10 +138,7 @@ private struct NetworkPill: View {
         .padding(.vertical, 8)
         .background(bg)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.black.opacity(0.05))
-        )
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.05)))
     }
 }
 
@@ -164,18 +160,13 @@ private struct EmptyHome: View {
 private struct Pager<Content: View>: View {
     let total: Int
     @ViewBuilder var contentBuilder: (CGFloat) -> Content
-
     init(total: Int, @ViewBuilder content: @escaping (CGFloat) -> Content) {
-        self.total = total
-        self.contentBuilder = content
+        self.total = total; self.contentBuilder = content
     }
-
     var body: some View {
         GeometryReader { geo in
-            TabView {
-                contentBuilder(geo.size.width)
-            }
-            .tabViewStyle(.page(indexDisplayMode: .automatic))
+            TabView { contentBuilder(geo.size.width) }
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
         }
         .frame(height: 520)
     }
@@ -184,22 +175,17 @@ private struct Pager<Content: View>: View {
 private struct PageGrid: View {
     let notes: [Note]
     var onOpen: (Note) -> Void
-
     var body: some View {
         ScrollView {
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 12),
-                          GridItem(.flexible(), spacing: 12)],
-                spacing: 12
-            ) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12)],
+                      spacing: 12) {
                 ForEach(notes) { n in
-                    Button {
-                        onOpen(n)
-                    } label: {
+                    Button { onOpen(n) } label: {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("💡 \(n.title)")
                                 .font(.headline)
-                            Text(n.description)                // <- no coalescing
+                            Text(n.description)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(6)

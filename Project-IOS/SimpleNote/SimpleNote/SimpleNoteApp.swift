@@ -24,15 +24,12 @@ struct SimpleNoteApp: App {
     @State private var screen: Screen = .splash
     @State private var access: String?
 
-    var body: some Scene {
-        WindowGroup { contentView }
-    }
+    var body: some Scene { WindowGroup { contentView } }
 
     @ViewBuilder
     private var contentView: some View {
         switch screen {
         case .splash:
-            // Try silent sign-in using refresh token
             Color.clear.onAppear { bootstrap() }
 
         case .onboarding:
@@ -59,23 +56,18 @@ struct SimpleNoteApp: App {
                 HomeView(
                     onAdd: { screen = .newNote },
                     onOpen: { note in screen = .editNote(note) },
-                    onOpenSettings: { screen = .settings },
-                    onLogout: { TokenStore.clear(); screen = .login }
+                    onOpenSettings: { screen = .settings }
                 )
             }
 
         case .newNote:
             NavigationStack {
-                NoteEditorView(existing: nil) {
-                    screen = .home
-                }
+                NoteEditorView(existing: nil) { screen = .home }
             }
 
         case .editNote(let note):
             NavigationStack {
-                NoteEditorView(existing: note) {
-                    screen = .home
-                }
+                NoteEditorView(existing: note) { screen = .home }
             }
 
         case .settings:
@@ -106,7 +98,6 @@ struct SimpleNoteApp: App {
                     access = new.access
                     screen = .home
                 } catch {
-                    // no valid refresh → show onboarding
                     screen = .onboarding
                 }
             }
