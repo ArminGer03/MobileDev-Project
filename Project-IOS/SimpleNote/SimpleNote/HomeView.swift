@@ -14,12 +14,11 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 10) {
-                // Effective pill status: timeout (from VM) wins; otherwise OS connectivity
+                // Pill status: timeout (from VM) wins; otherwise OS connectivity
                 let effectiveStatus: NetStatus = {
                     if case .timeout = vm.status { return vm.status }
                     return net.isOnline ? .available : .connecting
                 }()
-
                 NetworkPill(status: effectiveStatus)
                     .padding(.horizontal, 16)
 
@@ -54,6 +53,7 @@ struct HomeView: View {
                             )
                             .frame(width: pageWidth)
                             .task { await vm.ensure(page: page) }
+                            .tag(page) // <-- help TabView index dots
                         }
                     }
                     .padding(.horizontal, 16)
@@ -157,16 +157,35 @@ private struct EmptyHome: View {
     }
 }
 
-private struct Pager<Content: View>: View {
+/// A full-width pager that ALWAYS shows dots when there’s more than 1 page.
+/// Works on iOS 14–18.
+private struct Pager<PageContent: View>: View {
     let total: Int
-    @ViewBuilder var contentBuilder: (CGFloat) -> Content
-    init(total: Int, @ViewBuilder content: @escaping (CGFloat) -> Content) {
-        self.total = total; self.contentBuilder = content
+    @ViewBuilder var contentBuilder: (CGFloat) -> PageContent
+
+    init(total: Int, @ViewBuilder content: @escaping (CGFloat) -> PageContent) {
+        self.total = total
+        self.contentBuilder = content
     }
+
     var body: some View {
         GeometryReader { geo in
-            TabView { contentBuilder(geo.size.width) }
-                .tabViewStyle(.page(indexDisplayMode: .automatic))
+            Group {
+                if #available(iOS 16.0, *) {
+                    TabView {
+                        contentBuilder(geo.size.width)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: total > 1 ? .always : .never))
+                } else {
+                    TabView {
+                        contentBuilder(geo.size.width)
+                    }
+                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: total > 1 ? .always : .never))
+                    .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .padding(.bottom, 8) // keep dots from being clipped
         }
         .frame(height: 520)
     }
@@ -185,10 +204,12 @@ private struct PageGrid: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("💡 \(n.title)")
                                 .font(.headline)
+                                .multilineTextAlignment(.leading)
                             Text(n.description)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(6)
+                                .multilineTextAlignment(.leading)
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
@@ -197,7 +218,7 @@ private struct PageGrid: View {
                     }
                 }
             }
-            .padding(.bottom, 72/2 + 24)
+            .padding(.bottom, 72/2 + 24) // room for FAB
         }
     }
 }
