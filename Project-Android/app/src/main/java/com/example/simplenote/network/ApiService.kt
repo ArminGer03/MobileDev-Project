@@ -7,7 +7,6 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.*
-import java.util.concurrent.TimeUnit
 
 
 // for deployed use case
@@ -22,8 +21,10 @@ data class LoginRequest(val username: String, val password: String)
 data class TokenResponse(val access: String, val refresh: String)
 data class ChangePasswordRequest(val old_password: String, val new_password: String)
 data class ChangePasswordResponse(val detail: String)
-data class RefreshRequest(val refresh: String)
+data class RefreshRequest(val refresh: String?)
 data class RefreshResponse(val access: String)
+
+data class AccessOnly(val access: String)
 
 
 data class RegisterRequest(
@@ -81,11 +82,17 @@ interface ApiService {
     @POST("api/auth/token/")
     suspend fun login(@Body body: LoginRequest): TokenResponse
 
+
     @POST("api/auth/register/")
     suspend fun register(@Body body: RegisterRequest): RegisterResponse
 
+    // keep your suspend refresh
     @POST("api/auth/token/refresh/")
-    suspend fun refresh(@Body body: RefreshRequest): RefreshResponse
+    suspend fun refresh(@Body body: RefreshRequest): AccessOnly
+
+    // add this sync version for the Authenticator
+    @POST("api/auth/token/refresh/")
+    fun refreshSync(@Body body: RefreshRequest): retrofit2.Call<AccessOnly>
 
     @GET("api/auth/userinfo/")
     suspend fun getUserInfo(@Header("Authorization") auth: String): UserInfoResponse
@@ -133,24 +140,33 @@ interface ApiService {
         @Query("page") page: Int? = null,
         @Query("page_size") pageSize: Int? = null
     ): PagedNotesResponse
+
+
 }
 
 object ApiClient {
+    private const val BASE = BASE_URL // your existing const
+
     val api: ApiService by lazy {
         val logger = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
+
         val client = OkHttpClient.Builder()
             .addInterceptor(logger)
-            .connectTimeout(3, TimeUnit.SECONDS)   // NEW
-            .readTimeout(3, TimeUnit.SECONDS)      // NEW
-            .writeTimeout(3, TimeUnit.SECONDS)     // NEW
+            .addInterceptor(AuthHeaderInterceptor())         // attach access
+            .authenticator(TokenRefreshAuthenticator(BASE))  // refresh on 401
+            .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
             .build()
+
         val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(BASE)
             .client(client)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(ApiService::class.java)
     }
 }
+
 

@@ -3,10 +3,13 @@ package com.example.simplenote
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import com.example.simplenote.auth.TokenStore
+import com.example.simplenote.network.ApiClient
+import com.example.simplenote.network.RefreshRequest
 import com.example.simplenote.ui.theme.SimpleNoteTheme
 import java.util.UUID
-import androidx.compose.material3.Text
 
 class MainActivity : ComponentActivity() {
 
@@ -22,30 +25,65 @@ class MainActivity : ComponentActivity() {
         data object ChangePassword : Screen()
     }
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
+            // unique session key for editor screens
             var editorSessionKey by remember { mutableStateOf<String?>(null) }
 
             SimpleNoteTheme {
                 var screen by remember { mutableStateOf<Screen>(Screen.Onboarding) }
                 var accessToken by remember { mutableStateOf<String?>(null) }
                 var lastRegisteredUsername by remember { mutableStateOf<String?>(null) }
+                var bootChecked by remember { mutableStateOf(false) }
 
+                // ---- BOOTSTRAP (persisted login) ----
+                LaunchedEffect(Unit) {
+                    // TokenStore.init() is called in Application (SimpleNoteApp)
+                    val storedRefresh = TokenStore.refresh()
+                    val storedAccess = TokenStore.access()
+
+                    if (storedRefresh != null) {
+                        if (storedAccess.isNullOrEmpty()) {
+                            // Try to get a fresh access token once
+                            runCatching {
+                                val newAccess = ApiClient.api.refresh(RefreshRequest(storedRefresh)).access
+                                TokenStore.saveAccess(newAccess)
+                                accessToken = newAccess
+                                screen = Screen.Home
+                            }.onFailure {
+                                TokenStore.clear()
+                                screen = Screen.Login
+                            }
+                        } else {
+                            // We have an access token; authenticator will refresh on 401
+                            accessToken = storedAccess
+                            screen = Screen.Home
+                        }
+                    } else {
+                        // No tokens yet → onboarding → login
+                        screen = Screen.Onboarding
+                    }
+                    bootChecked = true
+                }
+
+                // Safety: if access is cleared (logout), return to Onboarding/Login
                 LaunchedEffect(accessToken) {
-                    if (accessToken == null) {
+                    if (bootChecked && accessToken == null) {
                         screen = Screen.Onboarding
                     }
                 }
+
                 when (val s = screen) {
                     is Screen.Onboarding -> OnboardingScreen(
                         onGetStarted = { screen = Screen.Login }
                     )
 
                     is Screen.Login -> LoginScreen(
-                        onLoginSuccess = { access, _ ->
+                        onLoginSuccess = { access, refresh ->
+                            // Persist both tokens and go Home
+                            TokenStore.saveTokens(access, refresh)
                             accessToken = access
                             screen = Screen.Home
                         },
@@ -54,9 +92,9 @@ class MainActivity : ComponentActivity() {
 
                     is Screen.Register -> RegisterScreen(
                         onBackToLogin = { screen = Screen.Login },
-                        onRegistered = { username, email ->
-                            // optional: store for prefill, but DO NOT navigate here
-                            // lastRegisteredUsername = username
+                        onRegistered = { username, _ ->
+                            // keep for potential prefill if you like
+                            lastRegisteredUsername = username
                         }
                     )
 
@@ -74,10 +112,9 @@ class MainActivity : ComponentActivity() {
                         username = lastRegisteredUsername
                     )
 
-
                     is Screen.NewNote -> NoteEditorScreen(
                         accessToken = accessToken.orEmpty(),
-                        sessionKey = editorSessionKey ?: UUID.randomUUID().toString(), // pass key
+                        sessionKey = editorSessionKey ?: UUID.randomUUID().toString(),
                         existingNoteId = null,
                         onBack = { screen = Screen.Home },
                         onSavedAndExit = { screen = Screen.Home }
@@ -92,7 +129,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     is Screen.Detail -> {
-                        // TODO: Note details screen (not part of this step)
+                        // (not used right now)
                         Text("Note detail: ${s.noteId}")
                     }
 
@@ -100,6 +137,8 @@ class MainActivity : ComponentActivity() {
                         accessToken = accessToken.orEmpty(),
                         onChangePassword = { screen = Screen.ChangePassword },
                         onLogoutSuccess = {
+                            // Clear tokens and return to Login
+                            TokenStore.clear()
                             accessToken = null
                             screen = Screen.Login
                         },
@@ -111,8 +150,6 @@ class MainActivity : ComponentActivity() {
                         onPasswordChanged = { screen = Screen.Settings },
                         onBack = { screen = Screen.Settings }
                     )
-
-
                 }
             }
         }
