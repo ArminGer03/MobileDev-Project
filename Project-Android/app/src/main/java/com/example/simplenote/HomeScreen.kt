@@ -156,12 +156,14 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             NetworkStatusPill(
-                isTimeout = ui.timeoutActive,   // <-- use the sticky flag
+                isTimeout = ui.timeoutActive,
                 status = netStatus,
+                retryInSec = ui.retryInSec,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
             )
+
 
             when {
                 ui.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -441,16 +443,20 @@ private fun EmptyState(modifier: Modifier = Modifier, username: String?) {
 private fun NetworkStatusPill(
     isTimeout: Boolean,
     status: com.example.simplenote.util.ConnectivityObserver.Status,
+    retryInSec: Int,                             // NEW
     modifier: Modifier = Modifier
 ) {
     val (bg, dot, text) =
         if (isTimeout) {
-            Triple(Color(0xFFFFEBEE), Color(0xFFD32F2F), "Timeout")
+            val label = if (retryInSec > 0) "Timeout — retry in ${retryInSec}s" else "Timeout — retrying…"
+            Triple(Color(0xFFFFEBEE), Color(0xFFD32F2F), label)
         } else when (status) {
-            com.example.simplenote.util.ConnectivityObserver.Status.Available -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "Online")
+            com.example.simplenote.util.ConnectivityObserver.Status.Available ->
+                Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "Online")
             com.example.simplenote.util.ConnectivityObserver.Status.Losing,
             com.example.simplenote.util.ConnectivityObserver.Status.Lost,
-            com.example.simplenote.util.ConnectivityObserver.Status.Unavailable -> Triple(Color(0xFFFFF8E1), Color(0xFFF57C00), "Connecting…")
+            com.example.simplenote.util.ConnectivityObserver.Status.Unavailable ->
+                Triple(Color(0xFFFFF8E1), Color(0xFFF57C00), "Connecting…")
         }
 
     Surface(
