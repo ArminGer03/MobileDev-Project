@@ -1,10 +1,3 @@
-//
-//  HomeView.swift
-//  SimpleNote
-//
-//  Created by Armin on 9/13/25.
-//
-
 import SwiftUI
 
 struct HomeView: View {
@@ -13,6 +6,7 @@ struct HomeView: View {
 
     var onAdd: () -> Void
     var onOpen: (Note) -> Void
+    var onOpenSettings: () -> Void
     var onLogout: () -> Void
 
     @State private var query = ""
@@ -20,22 +14,21 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 10) {
-                // Effective status for the pill:
-                // - Timeout (from VM) always wins
-                // - otherwise reflect OS connectivity
+
+                // Compose an effective status for the pill
                 let effectiveStatus: NetStatus = {
                     if case .timeout = vm.status { return vm.status }
                     return net.isOnline ? .available : .connecting
                 }()
 
                 NetworkPill(status: effectiveStatus)
-                    .padding(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    .padding(.horizontal, 16)
 
                 if let err = vm.error, !err.isEmpty {
                     Text(err)
                         .font(.footnote)
                         .foregroundStyle(.red)
-                        .padding(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                        .padding(.horizontal, 16)
                 }
 
                 if !vm.hasNotes {
@@ -49,19 +42,21 @@ struct HomeView: View {
                     .padding(12)
                     .background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    .padding(.horizontal, 16)
 
                     Text("Notes")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
 
+                    // Pager (one grid per page)
                     Pager(total: vm.totalPages) { pageWidth in
                         ForEach(1...vm.totalPages, id: \.self) { page in
                             PageGrid(
                                 notes: (vm.pages[page] ?? []).filter { n in
-                                    query.isEmpty ||
-                                    n.title.lowercased().contains(query.lowercased()) ||
-                                    n.description.lowercased().contains(query.lowercased())
+                                    let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                                    guard !q.isEmpty else { return true }
+                                    return n.title.lowercased().contains(q)
+                                        || n.description.lowercased().contains(q)   // <- no ??
                                 },
                                 onOpen: onOpen
                             )
@@ -69,21 +64,21 @@ struct HomeView: View {
                             .task { await vm.ensure(page: page) }
                         }
                     }
-                    .padding(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+                    .padding(.horizontal, 16)
                 }
 
                 Spacer(minLength: 0)
-                Color.clear.frame(height: 80) // space for bottom bar
+                Color.clear.frame(height: 80)
             }
 
-            // FAB centered over tab bar
+            // Centered FAB
             VStack {
                 Spacer()
                 Button(action: onAdd) {
                     Image(systemName: "plus")
                         .font(.system(size: 24, weight: .bold))
                         .frame(width: 72, height: 72)
-                        .background(Color(red: 0.314, green: 0.306, blue: 0.765))
+                        .background(Color(red: 0.314, green: 0.306, blue: 0.765)) // #504EC3
                         .foregroundStyle(.white)
                         .clipShape(Circle())
                         .shadow(radius: 6)
@@ -91,29 +86,34 @@ struct HomeView: View {
                 .offset(y: -40)
             }
         }
-        // Kick first load on appear
+        // First load on appear
         .task {
             if vm.pages.isEmpty { await vm.initLoad() }
         }
-        // When OS connectivity flips online, retry if we still have nothing
+        // Retry when OS connectivity becomes online
         .task(id: net.isOnline) {
-            if net.isOnline && vm.pages.isEmpty {
-                await vm.initLoad()
-            }
+            if net.isOnline && vm.pages.isEmpty { await vm.initLoad() }
         }
+        .navigationTitle("Home")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            // ✅ Use legacy placements to avoid the Visibility overload
+            ToolbarItem(placement: .navigationBarLeading) {
                 Button("Logout", action: onLogout)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: onOpenSettings) {
+                    Image(systemName: "gearshape")
+                }
             }
         }
     }
 }
 
 //
-// MARK: - Helpers in the same file
+// MARK: - Helpers (same file)
 //
 
-/// Floating pill that shows Online / Connecting… / Timeout — retry in N s
 private struct NetworkPill: View {
     let status: NetStatus
 
@@ -161,7 +161,6 @@ private struct EmptyHome: View {
     }
 }
 
-/// A simple full-width pager using TabView with page style.
 private struct Pager<Content: View>: View {
     let total: Int
     @ViewBuilder var contentBuilder: (CGFloat) -> Content
@@ -178,7 +177,7 @@ private struct Pager<Content: View>: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .automatic))
         }
-        .frame(height: 520) // enough height for the grid
+        .frame(height: 520)
     }
 }
 
@@ -200,7 +199,7 @@ private struct PageGrid: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("💡 \(n.title)")
                                 .font(.headline)
-                            Text(n.description)
+                            Text(n.description)                // <- no coalescing
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(6)
@@ -212,7 +211,7 @@ private struct PageGrid: View {
                     }
                 }
             }
-            .padding(.bottom, 72/2 + 24) // room for FAB
+            .padding(.bottom, 72/2 + 24)
         }
     }
 }

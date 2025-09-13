@@ -24,3 +24,10 @@ public struct PagedNotes: Codable {
     public let previous: String?
     public let results: [Note]
 }
+
+public struct UserInfo: Codable {
+    public let username: String
+    public let email: String
+    public let first_name: String?
+    public let last_name: String?
+}

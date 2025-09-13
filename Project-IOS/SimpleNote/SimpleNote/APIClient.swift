@@ -167,6 +167,22 @@ final class APIClient {
         let accessOnly: AccessOnly = try await refreshAccess(refresh: refresh)
         TokenStore.saveAccess(accessOnly.access)
     }
+    
+    func userInfo() async throws -> UserInfo {
+        try await request("api/auth/userinfo/")
+    }
+
+    /// POST /api/auth/change-password/  { old_password, new_password }
+    func changePassword(oldPassword: String, newPassword: String) async throws -> String {
+        struct Body: Encodable { let old_password: String; let new_password: String }
+        struct Resp: Decodable { let detail: String? } // backend may return {"detail": "..."}
+        let resp: Resp = try await request(
+            "api/auth/change-password/",
+            method: "POST",
+            body: Body(old_password: oldPassword, new_password: newPassword)
+        )
+        return resp.detail ?? "Password changed"
+    }
 }
 
 // MARK: - Light wrapper so we can pass any Encodable as the body

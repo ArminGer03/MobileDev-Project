@@ -9,7 +9,17 @@ import SwiftUI
 
 @main
 struct SimpleNoteApp: App {
-    enum Screen { case splash, onboarding, login, register, home, newNote, editNote(Note) }
+    enum Screen {
+        case splash
+        case onboarding
+        case login
+        case register
+        case home
+        case newNote
+        case editNote(Note)
+        case settings
+        case changePassword
+    }
 
     @State private var screen: Screen = .splash
     @State private var access: String?
@@ -22,6 +32,7 @@ struct SimpleNoteApp: App {
     private var contentView: some View {
         switch screen {
         case .splash:
+            // Try silent sign-in using refresh token
             Color.clear.onAppear { bootstrap() }
 
         case .onboarding:
@@ -44,17 +55,45 @@ struct SimpleNoteApp: App {
             )
 
         case .home:
-            HomeView(
-                onAdd: { screen = .newNote },
-                onOpen: { note in screen = .editNote(note) },
-                onLogout: { TokenStore.clear(); access = nil; screen = .login }
-            )
+            NavigationStack {
+                HomeView(
+                    onAdd: { screen = .newNote },
+                    onOpen: { note in screen = .editNote(note) },
+                    onOpenSettings: { screen = .settings },
+                    onLogout: { TokenStore.clear(); screen = .login }
+                )
+            }
 
         case .newNote:
-            NoteEditorView(existing: nil) { screen = .home }
+            NavigationStack {
+                NoteEditorView(existing: nil) {
+                    screen = .home
+                }
+            }
 
         case .editNote(let note):
-            NoteEditorView(existing: note) { screen = .home }
+            NavigationStack {
+                NoteEditorView(existing: note) {
+                    screen = .home
+                }
+            }
+
+        case .settings:
+            NavigationStack {
+                SettingsView(
+                    onBack: { screen = .home },
+                    onChangePassword: { screen = .changePassword },
+                    onLogout: { screen = .login }
+                )
+            }
+
+        case .changePassword:
+            NavigationStack {
+                ChangePasswordView(
+                    onBack: { screen = .settings },
+                    onDone: { screen = .settings }
+                )
+            }
         }
     }
 
@@ -67,6 +106,7 @@ struct SimpleNoteApp: App {
                     access = new.access
                     screen = .home
                 } catch {
+                    // no valid refresh → show onboarding
                     screen = .onboarding
                 }
             }
@@ -75,4 +115,3 @@ struct SimpleNoteApp: App {
         }
     }
 }
-
